@@ -20,6 +20,7 @@ you need ruby in system for use
 	$ ruby glgen.rb <core-version>
 
 you can specify OpenGL core version at <core-version> (default: 1.1)
+
 and then, you could get ggl.h, ggl.c, gglx.h, gglx.c, gwgl.h, gwgl.c
 
 Usage about ggl (generated C code)
