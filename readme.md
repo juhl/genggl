@@ -44,7 +44,7 @@ Usage about ggl (generated C code)
 	extern void gglx_init();
 	extern void gglx_bind(int enableDebug);
 
-##zwgl.h (for windows extension)##
+##gwgl.h (for windows extension)##
 
 	extern gglcaps_t gwglcaps;
 
