@@ -25,7 +25,7 @@ and then, you could get ggl.h, ggl.c, gglx.h, gglx.c, gwgl.h, gwgl.c
 
 Usage about ggl (generated C code)
 ----------------------------
-* ggl_init: ggl initializer. (it should be called after setting current GL context)
+* ggl_init: initializer. (it should be called after setting current GL context)
 * ggl_bind: binding ggl functions (actually you can use ggl functions by calling this function)
 * you can check extensions easily with provided struct. (ex. gglcaps._GL_EXT_texture3D)
 * there are additional platform dependent version (usage is same as above)
