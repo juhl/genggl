@@ -1,10 +1,10 @@
 #----------------------------------------------------------------------------------------------
 #
 # glgen.rb
-# GLgen (OpenGL extension C glue code generator)
+# GLgen (OpenGL C glue code generator)
 # Version: 0.1.0
 #
-# Copyright 2010 Ju Hyung Lee. All rights reserved.
+# Copyright 2011 Ju Hyung Lee. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without modification, are
 # permitted provided that the following conditions are met:
@@ -65,10 +65,10 @@ class GLGenerator
 /*********************************************************************************************
  *
  * #{filename}
- * #{$glgen_prefix}gl (OpenGL extension library)
+ * #{$glgen_prefix}gl (OpenGL glue code library)
  * Version: 0.1.0
  *
- * Copyright 2010 Ju Hyung Lee. All rights reserved.
+ * Copyright 2011 Ju Hyung Lee. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are
  * permitted provided that the following conditions are met:
