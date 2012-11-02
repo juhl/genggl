@@ -2,7 +2,7 @@
 #
 # glgen.rb
 # GLgen (OpenGL C glue code generator)
-# Version: 0.1.0
+# Version: 0.1.1
 #
 # Copyright 2011 Ju Hyung Lee. All rights reserved.
 #
@@ -32,7 +32,7 @@
 #
 #----------------------------------------------------------------------------------------------
 
-$glgen_version_string = "0.1.0"
+$glgen_version_string = "0.1.1"
 $glgen_prefix = "g"
 
 #
@@ -66,7 +66,7 @@ class GLGenerator
  *
  * #{filename}
  * #{$glgen_prefix}gl (OpenGL glue code library)
- * Version: 0.1.0
+ * Version: 0.1.1
  *
  * Copyright 2011 Ju Hyung Lee. All rights reserved.
  *
@@ -126,6 +126,9 @@ TEXT
         f << "#include <gl/gl.h>\n"
         f << "#include <gl/glu.h>\n\n"
         f << "#endif\n\n"
+      elsif @category_prefix == "WGL_"
+        f << "#include <windows.h>\n"
+        f << "#include <gl/gl.h>\n\n"
       end
 
       f << "#ifndef APIENTRY\n#define APIENTRY\n#endif\n"
@@ -210,7 +213,7 @@ TEXT
         if command.deprecated && command.deprecated.to_f <= $user_core_version
           f << "/* #{$glgen_prefix}#{@command_prefix}#{command.name} DEPRECATED by #{command.deprecated} */\n"
         else
-          f << "extern #{command.return_type} (*#{$glgen_prefix}#{@command_prefix}#{command.name})(#{command.params.join(", ")});\n"
+          f << "extern #{command.return_type} (APIENTRY *#{$glgen_prefix}#{@command_prefix}#{command.name})(#{command.params.join(", ")});\n"
         end
       else
       end
@@ -264,18 +267,18 @@ TEXT
         f << "/* #{$glgen_prefix}#{func_name} DEPRECATED by #{command.deprecated} */\n"
       else        
         if command.core? && command.core_version <= 1.1                  
-          f << "#{command.return_type} (*#{$glgen_prefix}#{func_name})(#{command.params.join(", ")});\n"
+          f << "#{command.return_type} (APIENTRY *#{$glgen_prefix}#{func_name})(#{command.params.join(", ")});\n"
           call_name = func_name
         else
-          f << "typedef #{command.return_type} (*PFN#{func_name.upcase})(#{command.params.join(", ")});\n"          
+          f << "typedef #{command.return_type} (APIENTRY *PFN#{func_name.upcase})(#{command.params.join(", ")});\n"          
           f << "PFN#{func_name.upcase} #{$glgen_prefix}#{func_name};\n"
           f << "static PFN#{func_name.upcase} _#{func_name};\n"
           call_name = "_" + func_name
         end
         
-        f << "static inline #{command.return_type} d_#{func_name}(#{command.params.join(", ")}) {\n"
+        f << "static #{command.return_type} APIENTRY d_#{func_name}(#{command.params.join(", ")}) {\n"
 
-        if command.return_type == "void"
+        if command.return_type.casecmp("void") == 0
           f << "\t#{call_name}("
         else
           f << "\t#{command.return_type} ret = #{call_name}("
@@ -295,7 +298,7 @@ TEXT
         end
 
         f << "\tif (!_#{$glgen_prefix}glBeginStarted) { CheckGLError(\"#{func_name}\"); }\n"
-        f << "\treturn ret;\n" if command.return_type != "void"
+        f << "\treturn ret;\n" if command.return_type.casecmp("void") != 0
         f << "}\n"
       end
     end
@@ -323,27 +326,27 @@ TEXT
       f << "#else\n"
     
       f << "void gl__DeleteProgramARB(GLhandleARB program) {\n"
-      f << "\tglDeleteObjctARB(program);\n"
+      f << "\t_glDeleteObjectARB(program);\n"
       f << "}\n"
     
       f << "void gl__DeleteShaderARB(GLhandleARB shader) {\n"
-      f << "\tglDeleteObjectARB(shader);\n"
+      f << "\t_glDeleteObjectARB(shader);\n"
       f << "}\n"
     
       f << "void gl__GetProgramivARB(GLuint program, GLenum pname, GLint* params) {\n"
-      f << "\tglGetObjectParameterivARB(program, pname, params);\n"
+      f << "\t_glGetObjectParameterivARB(program, pname, params);\n"
       f << "}\n"
     
       f << "void gl__GetShaderivARB(GLuint shader, GLenum pname, GLint* params) {\n"
-      f << "\tglGetObjectParameterivARB(shader, pname, params);\n"
+      f << "\t_glGetObjectParameterivARB(shader, pname, params);\n"
       f << "}\n"
     
       f << "void gl__GetProgramInfoLogARB(GLuint program, GLsizei bufSize, GLsizei* length, GLchar* infoLog) {\n"
-      f << "\tglGetInfoLogARB(program, bufSize, length, infoLog);\n"
+      f << "\t_glGetInfoLogARB(program, bufSize, length, infoLog);\n"
       f << "}\n"
     
       f << "void gl__GetShaderInfoLogARB(GLuint shader, GLsizei bufSize, GLsizei* length, GLchar* infoLog) {\n"
-      f << "\tglGetInfoLogARB(shader, bufSize, length, infoLog);\n"
+      f << "\t_glGetInfoLogARB(shader, bufSize, length, infoLog);\n"
       f << "}\n"
     
       f << "#endif\n"

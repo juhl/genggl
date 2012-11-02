@@ -2,7 +2,7 @@
 #
 # glspec.rb
 # GLgen (OpenGL extension C glue code generator)
-# Version: 0.1.0
+# Version: 0.1.1
 #
 # Copyright 2010 Ju Hyung Lee. All rights reserved.
 #
@@ -197,7 +197,9 @@ class GLSpec
           x = $2
           puts "WARNING: unmatched \"#{x}\"" if (x =~ /(\w+)\s+(\w+)\s+/) == nil
           param_name = $1
-          param_type = $2                             
+          # prevent using C keywords
+          param_name = "z#{param_name}" if param_name == "near" || param_name == "far"
+          param_type = $2
           x.sub!($&, '')
           param_type.sub!(/\w+\b/, "PixelInternalFormat") if command.name =~ /^TexImage(1|2|3)D/ && param_name == "internalformat" 
           puts "WARNING: unmatched \"#{x}\"" if (x =~ /(in|out)\s+(value|reference|array)/) == nil
