@@ -149,14 +149,13 @@ TEXT
       
       f << "extern #{basename}ext_t #{basename}ext;\n\n"
       
-      f << "extern void #{basename}_init(int enableDebug);\n"
-      f << "extern void #{basename}_rebind(int enableDebug);\n"
       if @category_prefix == "WGL_"
-        f << "extern void #{basename}_check_extensions(HDC hdc);\n"
+        f << "extern void #{basename}_init(HDC hdc, int enableDebug);\n"
       else
-        f << "extern void #{basename}_check_extensions();\n"
+        f << "extern void #{basename}_init(int enableDebug);\n"
       end
-
+      f << "extern void #{basename}_rebind(int enableDebug);\n"
+      
       f << "\n#ifdef __cplusplus\n}\n#endif\n\n"
       f << "#endif /* __#{basename.upcase}_H__ */\n"
     end
@@ -365,6 +364,8 @@ TEXT
       f << "\nvoid #{basename}_init(int enableDebug) {\n"
     end
 
+    f << "\tconst char *extensionString;\n"
+
     current_category = nil
     temp_commands = []
     
@@ -468,9 +469,9 @@ TEXT
     f << "\n"
 
     if @category_prefix == "WGL_"
-      f << "\tconst char *extensionString = (const char *)gwglGetExtensionsStringARB(hdc);\n"
+      f << "\textensionString = (const char *)gwglGetExtensionsStringARB(hdc);\n"
     else
-      f << "\tconst char *extensionString = (const char *)glGetString(GL_EXTENSIONS);\n"
+      f << "\textensionString = (const char *)glGetString(GL_EXTENSIONS);\n"
     end
 
     f << "\tmemset(&#{basename}ext, 0, sizeof(#{basename}ext));\n"
