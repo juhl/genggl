@@ -27,7 +27,6 @@ Usage about ggl (generated C code)
 ----------------------------
 * ggl_init: initialize ggl function pointers for use.
 * ggl_rebind: re-bind ggl function pointers for debug purpose
-* ggl_check_extensions: check the extensions
 * you can check extensions easily with provided struct. (ex. gglext._GL_EXT_texture3D)
 * there are additional platform dependent version (similar as above)
 
@@ -37,7 +36,6 @@ Usage about ggl (generated C code)
 
 	extern void ggl_init(int enableDebug);	
 	extern void ggl_rebind(int enableDebug);
-	extern void ggl_check_extensions();
 
 ##gwgl.h (for windows extension)##
 
@@ -45,15 +43,13 @@ Usage about ggl (generated C code)
 
 	extern void gwgl_init(int enableDebug);	
 	extern void gwgl_rebind(int enableDebug);
-	extern void gwgl_check_extensions(HDC hdc);
 
 ##gglx.h (for linux extension)##
 
 	extern gglcaps_t gglxcaps;
 
-	extern void gglx_init(int enableDebug);	
+	extern void gglx_init(HDC hdc, int enableDebug);	
 	extern void gglx_rebind(int enableDebug);
-	extern void gglx_check_extensions();
 
 Callback functions
 ----------------------------
