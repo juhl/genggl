@@ -201,7 +201,7 @@ class GLSpec
           param_name = "z#{param_name}" if param_name == "near" || param_name == "far"
           param_type = $2
           x.sub!($&, '')
-          param_type.sub!(/\w+\b/, "PixelInternalFormat") if command.name =~ /^TexImage(1|2|3)D/ && param_name == "internalformat" 
+          #param_type.sub!(/\w+\b/, "PixelInternalFormat") if command.name =~ /^TexImage(1|2|3)D/ && param_name == "internalformat" 
           puts "WARNING: unmatched \"#{x}\"" if (x =~ /(in|out)\s+(value|reference|array)/) == nil
 
           param = GLCommandParam.new
