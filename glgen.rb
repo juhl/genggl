@@ -466,6 +466,7 @@ TEXT
     
     print_temp_commands.call if !temp_commands.empty?
 
+    f << "\t#{basename}_rebind(enableDebug);\n"
     f << "\n"
 
     if @category_prefix == "WGL_"
@@ -480,8 +481,7 @@ TEXT
       next if category_name !~ /^(#{@spec.extension_group_names.join('|')})_/
       f << "\tif (strstr(extensionString, \"#{@category_prefix}#{category_name}\")) #{basename}ext._#{@category_prefix}#{category_name} = 1;\n"
     end
-
-    f << "\t#{basename}_rebind(enableDebug);\n"
+    
     f << "}\n\n"
   end
   
