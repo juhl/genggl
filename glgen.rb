@@ -145,12 +145,17 @@ TEXT
         f << "\tint _#{@category_prefix}#{category_name} : 1;\n"
       end
       
-      f << "} #{basename}caps_t;\n\n";
+      f << "} #{basename}ext_t;\n\n";
       
-      f << "extern #{basename}caps_t #{basename}caps;\n\n"
+      f << "extern #{basename}ext_t #{basename}ext;\n\n"
       
-      f << "extern void #{basename}_init();\n"
-      f << "extern void #{basename}_bind(int enableDebug);\n"
+      f << "extern void #{basename}_init(int enableDebug);\n"
+      f << "extern void #{basename}_rebind(int enableDebug);\n"
+      if @category_prefix == "WGL_"
+        f << "extern void #{basename}_check_extensions(HDC hdc);\n"
+      else
+        f << "extern void #{basename}_check_extensions();\n"
+      end
 
       f << "\n#ifdef __cplusplus\n}\n#endif\n\n"
       f << "#endif /* __#{basename.upcase}_H__ */\n"
@@ -241,10 +246,11 @@ TEXT
       f << "#define GPA(a) glXGetProcAddressARB((const GLubyte *)\#a)\n"
       f << "#endif\n\n"
       
-      f << "#{basename}caps_t #{basename}caps;\n"
+      f << "#{basename}ext_t #{basename}ext;\n"
       
       write_source_func_init(basename, f)
-      write_source_func_bind(basename, f)
+      write_source_func_rebind(basename, f)
+      write_source_func_check_extensions(basename, f)
     end
 
     puts "#{basename}.c generated"
@@ -354,21 +360,13 @@ TEXT
   end
   
   def write_source_func_init(basename, f)
-    f << "\nvoid #{basename}_init()\n{\n"
-    
-    f << "\tconst char *extensionString = (const char *)glGetString(GL_EXTENSIONS);\n"
-    f << "\tmemset(&#{basename}caps, 0, sizeof(#{basename}caps));\n"
-    
-    @spec.categories.sort.each do |category_name|
-      next if category_name !~ /^(#{@spec.extension_group_names.join('|')})_/
-      f << "\tif (strstr(extensionString, \"#{@category_prefix}#{category_name}\")) #{basename}caps._#{@category_prefix}#{category_name} = 1;\n"
-    end
+    f << "\nvoid #{basename}_init(int enableDebug) {\n"
 
     current_category = nil
     temp_commands = []
     
     print_temp_commands = lambda do
-      f << "\n\t/* #{@category_prefix}#{temp_commands[0].category} */\n"
+      f << "\t/* #{@category_prefix}#{temp_commands[0].category} */\n"
       
       if temp_commands[0].core? && temp_commands[0].core_version > 1.1
         f << "#ifdef #{@category_prefix}VERSION_#{temp_commands[0].core_version.to_s.sub('.', '_')}\n"
@@ -462,13 +460,14 @@ TEXT
       current_category = command.category
     end
     
-    print_temp_commands.call if !temp_commands.empty?    
+    print_temp_commands.call if !temp_commands.empty?
 
+    f << "\t#{basename}_rebind(enableDebug);\n"
     f << "}\n\n"
   end
   
-  def write_source_func_bind(basename, f)
-    f << "void #{basename}_bind(int enableDebug)\n{\n"
+  def write_source_func_rebind(basename, f)
+    f << "void #{basename}_rebind(int enableDebug) {\n"
     f << "\tif (!enableDebug) {\n"
     
     @spec.command_array.each do |command|
@@ -493,6 +492,25 @@ TEXT
     end
     
     f << "\t}\n"
+    f << "}\n"
+  end
+
+  def write_source_func_check_extensions(basename, f)
+    if @category_prefix == "WGL_"
+      f << "void #{basename}_check_extensions(HDC hdc) {\n"
+      f << "\tconst char *extensionString = (const char *)gwglGetExtensionsStringARB(hdc);\n"
+    else
+      f << "void #{basename}_check_extensions() {\n"
+      f << "\tconst char *extensionString = (const char *)glGetString(GL_EXTENSIONS);\n"
+    end
+
+    f << "\tmemset(&#{basename}ext, 0, sizeof(#{basename}ext));\n"
+    
+    @spec.categories.sort.each do |category_name|
+      next if category_name !~ /^(#{@spec.extension_group_names.join('|')})_/
+      f << "\tif (strstr(extensionString, \"#{@category_prefix}#{category_name}\")) #{basename}ext._#{@category_prefix}#{category_name} = 1;\n"
+    end
+
     f << "}\n"
   end
 end
@@ -529,7 +547,7 @@ if File.exist?("excluded_extensions.txt")
 end
 
 puts "GLGen Version: #{$glgen_version_string}"
-puts "trying to generate OpenGL glue code based on OpenGL version #{$user_core_version}"
+puts "trying to generate OpenGL C glue code based on OpenGL version #{$user_core_version}"
 
 #-------------------------------------------------------------------------------
 

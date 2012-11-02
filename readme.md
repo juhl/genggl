@@ -25,31 +25,35 @@ and then, you could get ggl.h, ggl.c, gglx.h, gglx.c, gwgl.h, gwgl.c
 
 Usage about ggl (generated C code)
 ----------------------------
-* ggl_init: initializer. (it should be called after setting current GL context)
-* ggl_bind: binding ggl functions (actually you can use ggl functions by calling this function)
-* you can check extensions easily with provided struct. (ex. gglcaps._GL_EXT_texture3D)
-* there are additional platform dependent version (usage is same as above)
+* ggl_init: initialize ggl function pointers for use.
+* ggl_rebind: re-bind ggl function pointers for debug purpose
+* ggl_check_extensions: check the extensions
+* you can check extensions easily with provided struct. (ex. gglext._GL_EXT_texture3D)
+* there are additional platform dependent version (similar as above)
 
 ##ggl.h##
 
 	extern gglcaps_t gglcaps;
 
-	extern void ggl_init();
-	extern void ggl_bind(int enableDebug);
-
-##gglx.h (for linux extension)##
-
-	extern gglcaps_t gglxcaps;
-
-	extern void gglx_init();
-	extern void gglx_bind(int enableDebug);
+	extern void ggl_init(int enableDebug);	
+	extern void ggl_rebind(int enableDebug);
+	extern void ggl_check_extensions();
 
 ##gwgl.h (for windows extension)##
 
 	extern gglcaps_t gwglcaps;
 
-	extern void gwgl_init();
-	extern void gwgl_bind(int enableDebug);
+	extern void gwgl_init(int enableDebug);	
+	extern void gwgl_rebind(int enableDebug);
+	extern void gwgl_check_extensions(HDC hdc);
+
+##gglx.h (for linux extension)##
+
+	extern gglcaps_t gglxcaps;
+
+	extern void gglx_init(int enableDebug);	
+	extern void gglx_rebind(int enableDebug);
+	extern void gglx_check_extensions();
 
 Callback functions
 ----------------------------
