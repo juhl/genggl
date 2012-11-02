@@ -2,7 +2,7 @@
 #
 # glgen.rb
 # GLgen (OpenGL C glue code generator)
-# Version: 0.1.1
+# Version: 0.1.2
 #
 # Copyright 2011 Ju Hyung Lee. All rights reserved.
 #
@@ -32,7 +32,7 @@
 #
 #----------------------------------------------------------------------------------------------
 
-$glgen_version_string = "0.1.1"
+$glgen_version_string = "0.1.2"
 $glgen_prefix = "g"
 
 #
@@ -66,7 +66,7 @@ class GLGenerator
  *
  * #{filename}
  * #{$glgen_prefix}gl (OpenGL glue code library)
- * Version: 0.1.1
+ * Version: 0.1.2
  *
  * Copyright 2011 Ju Hyung Lee. All rights reserved.
  *
@@ -250,7 +250,6 @@ TEXT
       
       write_source_func_init(basename, f)
       write_source_func_rebind(basename, f)
-      write_source_func_check_extensions(basename, f)
     end
 
     puts "#{basename}.c generated"
@@ -360,7 +359,11 @@ TEXT
   end
   
   def write_source_func_init(basename, f)
-    f << "\nvoid #{basename}_init(int enableDebug) {\n"
+    if @category_prefix == "WGL_"
+      f << "\nvoid #{basename}_init(HDC hdc, int enableDebug) {\n"
+    else
+      f << "\nvoid #{basename}_init(int enableDebug) {\n"
+    end
 
     current_category = nil
     temp_commands = []
@@ -462,6 +465,21 @@ TEXT
     
     print_temp_commands.call if !temp_commands.empty?
 
+    f << "\n"
+
+    if @category_prefix == "WGL_"
+      f << "\tconst char *extensionString = (const char *)gwglGetExtensionsStringARB(hdc);\n"
+    else
+      f << "\tconst char *extensionString = (const char *)glGetString(GL_EXTENSIONS);\n"
+    end
+
+    f << "\tmemset(&#{basename}ext, 0, sizeof(#{basename}ext));\n"
+    
+    @spec.categories.sort.each do |category_name|
+      next if category_name !~ /^(#{@spec.extension_group_names.join('|')})_/
+      f << "\tif (strstr(extensionString, \"#{@category_prefix}#{category_name}\")) #{basename}ext._#{@category_prefix}#{category_name} = 1;\n"
+    end
+
     f << "\t#{basename}_rebind(enableDebug);\n"
     f << "}\n\n"
   end
@@ -492,25 +510,6 @@ TEXT
     end
     
     f << "\t}\n"
-    f << "}\n"
-  end
-
-  def write_source_func_check_extensions(basename, f)
-    if @category_prefix == "WGL_"
-      f << "void #{basename}_check_extensions(HDC hdc) {\n"
-      f << "\tconst char *extensionString = (const char *)gwglGetExtensionsStringARB(hdc);\n"
-    else
-      f << "void #{basename}_check_extensions() {\n"
-      f << "\tconst char *extensionString = (const char *)glGetString(GL_EXTENSIONS);\n"
-    end
-
-    f << "\tmemset(&#{basename}ext, 0, sizeof(#{basename}ext));\n"
-    
-    @spec.categories.sort.each do |category_name|
-      next if category_name !~ /^(#{@spec.extension_group_names.join('|')})_/
-      f << "\tif (strstr(extensionString, \"#{@category_prefix}#{category_name}\")) #{basename}ext._#{@category_prefix}#{category_name} = 1;\n"
-    end
-
     f << "}\n"
   end
 end
