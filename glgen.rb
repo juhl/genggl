@@ -139,6 +139,7 @@ TEXT
       write_header_function_prototypes(f)
       
       f << "\ntypedef struct {\n"
+      f << "\tconst char *str;\n"
       
       @spec.categories.sort.each do |category_name|
         next if category_name !~ /^(#{@spec.extension_group_names.join('|')})_/
@@ -364,8 +365,6 @@ TEXT
       f << "\nvoid #{basename}_init(int enableDebug) {\n"
     end
 
-    f << "\tconst char *extensionString;\n"
-
     current_category = nil
     temp_commands = []
     
@@ -469,17 +468,17 @@ TEXT
     f << "\t#{basename}_rebind(enableDebug);\n"
     f << "\n"
 
-    if @category_prefix == "WGL_"
-      f << "\textensionString = (const char *)gwglGetExtensionsStringARB(hdc);\n"
-    else
-      f << "\textensionString = (const char *)glGetString(GL_EXTENSIONS);\n"
-    end
-
     f << "\tmemset(&#{basename}ext, 0, sizeof(#{basename}ext));\n"
+
+    if @category_prefix == "WGL_"
+      f << "\t#{basename}ext.str = (const char *)gwglGetExtensionsStringARB(hdc);\n"
+    else
+      f << "\t#{basename}ext.str = (const char *)glGetString(GL_EXTENSIONS);\n"
+    end    
     
     @spec.categories.sort.each do |category_name|
       next if category_name !~ /^(#{@spec.extension_group_names.join('|')})_/
-      f << "\tif (strstr(extensionString, \"#{@category_prefix}#{category_name}\")) #{basename}ext._#{@category_prefix}#{category_name} = 1;\n"
+      f << "\tif (strstr(#{basename}ext.str, \"#{@category_prefix}#{category_name}\")) #{basename}ext._#{@category_prefix}#{category_name} = 1;\n"
     end
     
     f << "}\n\n"

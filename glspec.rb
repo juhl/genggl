@@ -112,7 +112,7 @@ class GLSpecElement
 end
 
 class GLSpec
-  attr_reader :enumext_elements, :glspec_elements, :type_hash, :categories, :extension_group_names, :command_array
+  attr_reader :versions, :enumext_elements, :glspec_elements, :type_hash, :categories, :extension_group_names, :command_array
   
   def initialize(url)
     @enumext_elements = []
@@ -179,12 +179,14 @@ class GLSpec
     command = nil    
     parse_url_each_line(url) do |line|
       if line =~ /^category:\s+/
-        @categories = line.sub(/^category:\s+/, '').split        
+        @categories = line.sub(/^category:\s+/, '').split
       elsif line =~ /(^pass(thru|end)):/
         @glspec_elements << GLSpecElement.new($1.to_sym, line.sub(/^\w+: ?/, ''))
       elsif line =~ /^newcategory:\s+(\w+)/
         @categories << $1
         @glspec_elements << GLSpecElement.new(:newcategory, $1)
+      elsif line =~ /^version:\s+/
+        @versions = line.sub(/^version:\s+/, '').split
       elsif line =~ /(^\w+?)\(.*\)/ # command
         @command_array << command = GLCommand.new($1, self)
         @command_hash[$1] = command
