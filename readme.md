@@ -1,25 +1,25 @@
 About
 ============================
 
-GLGen is platform independent OpenGL API C glue code generator written in ruby
+GLGen is platform independent OpenGL API C glue code generator written in ruby.
 
-it will help to write your OpenGL program with no concerning about OpenGL version and platform (not including OpenGL ES)
+It will help you to write OpenGL C/C++ code with no concerning OpenGL versions and platforms. (not including OpenGL ES)
 
 Features
 ----------------------------
 
-* platform independent binding to specific OpenGL version (you can specify version as argument)
-* it parse [OpenGL registry](http://www.opengl.org/registry) spec files as source for up-to-date API
-* there are debug helper per OpenGL function call
+* Platform independent binding to specific OpenGL version (you can specify version as argument)
+* Directly parse [OpenGL registry](http://www.opengl.org/registry) spec files as source for up-to-date API
+* There are debug functionality per OpenGL function call
 
 Usage
 ----------------------------
-you need ruby in system for use
+need ruby in system for use
 
 	$ cd glgen
 	$ ruby glgen.rb <core-version>
 
-you can specify OpenGL core version at <core-version> (default: 1.1)
+specify OpenGL core version at <core-version> (default: 1.1)
 
 and then, you could get ggl.h, ggl.c, gglx.h, gglx.c, gwgl.h, gwgl.c
 
