@@ -120,6 +120,7 @@ class GLSpec
     @type_hash = {}
     @command_array = []
     @command_hash = {}
+    @categories = []
     
     puts "parsing #{url[:typemap]}..."
     parse_typemap_url(url[:typemap])
@@ -179,7 +180,7 @@ class GLSpec
     command = nil    
     parse_url_each_line(url) do |line|
       if line =~ /^category:\s+/
-        @categories = line.sub(/^category:\s+/, '').split
+        @categories.concat(line.sub(/^category:\s+/, '').split)
       elsif line =~ /(^pass(thru|end)):/
         @glspec_elements << GLSpecElement.new($1.to_sym, line.sub(/^\w+: ?/, ''))
       elsif line =~ /^newcategory:\s+(\w+)/
