@@ -117,7 +117,7 @@ TEXT
         f << "#include <windows.h>\n"
         f << "#include <gl/gl.h>\n"
         f << "#include <gl/glu.h>\n\n"
-        f << "#elif defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__)\n\n"
+        f << "#elif defined(__APPLE__)\n\n"
         f << "#define GL_GLEXT_LEGACY\n"
         f << "#include <OpenGL/CGLTypes.h>\n"
         f << "#include <OpenGL/gl.h>\n"
@@ -239,7 +239,7 @@ TEXT
       
       f << "\n#ifdef _WIN32\n"
       f << "#define GPA(a) wglGetProcAddress(\#a)\n"
-      f << "#elif defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__)\n"
+      f << "#elif defined(__APPLE__)\n"
       f << "#define GPA(a) mglGetProcAddress(\#a)\n"
       f << "extern void *mglGetProcAddress(const char *name);\n"
       f << "#elif defined(__linux__)\n"
