@@ -61,7 +61,7 @@ class GLCommand
     @category =~ /_DEPRECATED$/ ? true : false
   end
   
-  def core_version
+  def core_version    
     @category =~ /^VERSION_(\d+_\d+)/ ? $1.sub('_', '.').to_f : nil
   end
 

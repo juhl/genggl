@@ -14,7 +14,7 @@ Features
 
 Usage
 ----------------------------
-First off, needed ruby in system for use
+First off, needed ruby 1.9 in system for use
 
 	$ cd glgen
 	$ ruby glgen.rb <core-version>

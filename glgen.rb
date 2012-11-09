@@ -48,7 +48,7 @@ $glgen_prefix = "g"
 require 'rbconfig'
 require './glspec.rb'
 
-include Config
+include RbConfig
 
 class GLGenerator
   attr_reader :spec
@@ -172,13 +172,13 @@ TEXT
         f << "#endif\n\n" if current_enum_label
         current_enum_label = e.data
 
-        if e.data =~ /VERSION_(\d+_\d+)/
-          v = e.data.sub('_', '.').to_f
-          if v <= 1.1 || v > $user_core_version
-            current_enum_label = nil
-            next
-          end
-        end
+#         if e.data =~ /VERSION_(\d+_\d+)/
+#          v = $1.sub('_', '.').to_f
+#          if v <= 1.1 || v > $user_core_version
+#            current_enum_label = nil
+#            next
+#          end
+#        end
 
         f << "#ifndef #{@enum_prefix}#{current_enum_label}\n"
       elsif current_enum_label
@@ -270,10 +270,10 @@ TEXT
       
       if command.deprecated && command.deprecated.to_f <= $user_core_version
         f << "/* #{$glgen_prefix}#{func_name} DEPRECATED by #{command.deprecated} */\n"
-      else        
-        if command.core? && command.core_version <= 1.1                  
+      else
+        if command.core? && command.core_version <= 1.1
           f << "#{command.return_type} (APIENTRY *#{$glgen_prefix}#{func_name})(#{command.params.join(", ")});\n"
-          call_name = func_name
+          call_name = func_name          
         else
           f << "typedef #{command.return_type} (APIENTRY *PFN#{func_name.upcase})(#{command.params.join(", ")});\n"          
           f << "PFN#{func_name.upcase} #{$glgen_prefix}#{func_name};\n"
@@ -517,7 +517,7 @@ end
 #-------------------------------------------------------------------------------
 
 def get_os_type
-  case CONFIG['host_os']
+  case RbConfig::CONFIG['host_os']
   when /mswin|windows/i then 'windows'
   when /linux/i then 'linux'
   when /darwin/i then 'macosx'
