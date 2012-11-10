@@ -41,14 +41,14 @@ Usage about ggl (generated C code)
 
 	extern gwglext_t gwglext;
 
-	extern void gwgl_init(int enableDebug);	
+	extern void gwgl_init(HDC hdc, int enableDebug);	
 	extern void gwgl_rebind(int enableDebug);
 
 ##gglx.h (for linux extension)##
 
 	extern gglxext_t gglxext;
 
-	extern void gglx_init(HDC hdc, int enableDebug);	
+	extern void gglx_init(int enableDebug);	
 	extern void gglx_rebind(int enableDebug);
 
 Callback functions
