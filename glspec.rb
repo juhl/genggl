@@ -2,7 +2,7 @@
 #
 # glspec.rb
 # GLgen (OpenGL extension C glue code generator)
-# Version: 0.1.2
+# Version: 0.2.0
 #
 # Copyright 2010 Ju Hyung Lee. All rights reserved.
 #
@@ -25,7 +25,7 @@
 # ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 # NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-# 
+#
 # The views and conclusions contained in the software and documentation are those of the
 # authors and should not be interpreted as representing official policies, either expressed
 # or implied, of Ju Hyung Lee.
@@ -37,16 +37,16 @@ require 'net/http'
 class GLCommandParam
   attr_reader :name, :typename, :pointer, :const
   attr_writer :name, :typename, :pointer, :const
-  
+
   def to_s
     (const ? "const " : "") + typename + (pointer ? "* " : " ") + name
   end
 end
 
 class GLCommand
-  attr_reader :name, :category, :vectorequiv, :alias, :original, :return_type, :params, :deprecated 
+  attr_reader :name, :category, :vectorequiv, :alias, :original, :return_type, :params, :deprecated
   attr_writer :name, :category, :vectorequiv, :alias, :original, :return_type, :params, :deprecated
-  
+
   def initialize(name, spec)
     @name = name
     @params = Array.new
@@ -56,23 +56,19 @@ class GLCommand
   def core?
     @category =~ /^VERSION_/ ? true : false
   end
-  
-  def deprecated?
-    @category =~ /_DEPRECATED$/ ? true : false
-  end
-  
-  def core_version    
+
+  def core_version
     @category =~ /^VERSION_(\d+_\d+)/ ? $1.sub('_', '.').to_f : nil
   end
 
-  def core_extension?
+  def core_extension? # 코어화된 extension (non post-fix)
     @category !~ /^VERSION_/ && @name !~ /(#{@spec.extension_group_names.join('|')})$/ ? true : false
   end
-  
-  def extension?
+
+  def extension? # 일반적인 extension
     @category !~ /^VERSION_/ && @name =~ /(#{@spec.extension_group_names.join('|')})$/ ? true : false
   end
-  
+
   def valid?(version)
     return true if core? && core_version <= version
     return true if core_extension?
@@ -83,6 +79,8 @@ class GLCommand
   def aliased
     alias_name = self.alias
     command = nil
+
+    # alias might be recursive
     while alias_name do
       command = @spec.command_array.find { |x| x.name == alias_name }
       puts "WARNING: alias \"#{alias_name}\" not found" if !command
@@ -95,7 +93,7 @@ end
 
 class GLDefine
   attr_reader :name, :value
-  
+
   def initialize(name, value)
     @name = name
     @value = value
@@ -104,7 +102,7 @@ end
 
 class GLSpecElement
   attr_reader :name, :data
-  
+
   def initialize(name, data)
     @name = name
     @data = data
@@ -113,7 +111,7 @@ end
 
 class GLSpec
   attr_reader :versions, :enumext_elements, :glspec_elements, :type_hash, :categories, :extension_group_names, :command_array
-  
+
   def initialize(url)
     @enumext_elements = []
     @glspec_elements = []
@@ -121,7 +119,7 @@ class GLSpec
     @command_array = []
     @command_hash = {}
     @categories = []
-    
+
     puts "parsing #{url[:typemap]}..."
     parse_typemap_url(url[:typemap])
 
@@ -131,37 +129,37 @@ class GLSpec
     puts "parsing #{url[:glspec]}..."
     parse_glspec_url(url[:glspec])
   end
-  
+
   def new_command(command_name)
     if !@command_hash[command_name]
       @command_array << command = GLCommand.new(command_name, self)
       @command_hash[command_name] = command
     end
   end
-  
+
   def del_command(command_name)
     if command = @command_hash[command_name]
       @command_array.delete(command)
       @command_hash[command_name] = nil
     end
   end
-  
+
   def find_command(command_name)
     @command_hash[command_name]
   end
-  
+
   def typemap(typename)
     return "void" if typename == "void"
     @type_hash[typename]
   end
-  
+
   def parse_typemap_url(url)
     parse_url_each_line(url) do |line|
       ar = line.split(',')
       @type_hash[ar[0]] = ar[3].to_s.strip
     end
   end
-  
+
   def parse_enumext_url(url)
     parse_url_each_line(url) do |line|
       if line =~ /(^pass(thru|end)):/
@@ -175,9 +173,9 @@ class GLSpec
       end
     end
   end
-  
+
   def parse_glspec_url(url)
-    command = nil    
+    command = nil
     parse_url_each_line(url) do |line|
       if line =~ /^category:\s+/
         @categories.concat(line.sub(/^category:\s+/, '').split)
@@ -204,7 +202,7 @@ class GLSpec
           param_name = "z#{param_name}" if param_name == "near" || param_name == "far"
           param_type = $2
           x.sub!($&, '')
-          #param_type.sub!(/\w+\b/, "PixelInternalFormat") if command.name =~ /^TexImage(1|2|3)D/ && param_name == "internalformat" 
+          #param_type.sub!(/\w+\b/, "PixelInternalFormat") if command.name =~ /^TexImage(1|2|3)D/ && param_name == "internalformat"
           puts "WARNING: unmatched \"#{x}\"" if (x =~ /(in|out)\s+(value|reference|array)/) == nil
 
           param = GLCommandParam.new
@@ -227,15 +225,15 @@ class GLSpec
         end
       end
     end
-    
+
     # EXT_texture_compression_s3tc is omitted in spec file
     @categories << "EXT_texture_compression_s3tc"
-    
+
     @categories.uniq!.sort!
     @extension_group_names = @categories.grep(/(^[A-Z0-9]+?)_/) { |x| $1 }.reject { |x| x =~ /^VERSION/ }.uniq
 
     @command_array.each do |command|
-      if command.alias        
+      if command.alias
         @command_hash[command.alias].original = command
       elsif !command.core? && command.vectorequiv
         ve_command = @command_hash[command.vectorequiv]
@@ -244,9 +242,9 @@ class GLSpec
           @command_hash[command.alias].original = command
         end
       end
-    end   
+    end
   end
-  
+
   def parse_url_each_line(url)
     Net::HTTP.get_response(URI.parse(url)) do |resp|
       resp.body.each_line do |line|

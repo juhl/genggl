@@ -2,9 +2,9 @@
 #
 # glgen.rb
 # GLgen (OpenGL C glue code generator)
-# Version: 0.1.2
+# Version: 0.2.0
 #
-# Copyright 2011 Ju Hyung Lee. All rights reserved.
+# Copyright 2010 Ju Hyung Lee. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without modification, are
 # permitted provided that the following conditions are met:
@@ -25,24 +25,15 @@
 # ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 # NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-# 
+#
 # The views and conclusions contained in the software and documentation are those of the
 # authors and should not be interpreted as representing official policies, either expressed
 # or implied, of Ju Hyung Lee.
 #
 #----------------------------------------------------------------------------------------------
 
-$glgen_version_string = "0.1.2"
+$glgen_version_string = "0.2.0"
 $glgen_prefix = "g"
-
-#
-# there are 4 different cases for binding way of the OpenGL function
-#
-#   case 1: systemCore -> userCore
-#   case 2: systemExtension -> userCore
-#   case 3: systemCore -> userExtension 
-#   case 4: systemExtension -> userExtension
-#
 
 #require 'profile'
 require 'rbconfig'
@@ -52,14 +43,14 @@ include RbConfig
 
 class GLGenerator
   attr_reader :spec
-  
+
   def initialize(spec, enum_prefix, command_prefix, category_prefix)
     @enum_prefix = enum_prefix
     @command_prefix = command_prefix
     @category_prefix = category_prefix
     @spec = spec
   end
-  
+
   def write_license_comment(f, filename)
     text = <<TEXT
 /*********************************************************************************************
@@ -98,75 +89,70 @@ class GLGenerator
 TEXT
     f << text
   end
-  
+
   def generate_header_and_source_file(basename)
     generate_header_file(basename)
     generate_source_file(basename)
   end
-  
+
   def generate_header_file(basename)
     File.open("#{basename}.h", "w") do |f|
       write_license_comment(f, "#{basename}.h")
-      
+
       f << "\n#ifndef __#{basename.upcase}_H__\n"
       f << "#define __#{basename.upcase}_H__\n\n"
       f << "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n"
-      
+
       if @category_prefix == "GL_"
         f << "#ifdef _WIN32\n\n"
         f << "#include <windows.h>\n"
-        f << "#include <gl/gl.h>\n"
-        f << "#include <gl/glu.h>\n\n"
+        f << "#include <gl/gl.h>\n\n"
         f << "#elif defined(__APPLE__)\n\n"
         f << "#define GL_GLEXT_LEGACY\n"
-        f << "#include <OpenGL/CGLTypes.h>\n"
-        f << "#include <OpenGL/gl.h>\n"
-        f << "#include <OpenGL/glu.h>\n\n"
-        f << "#elif defined(__linux__)\n\n"
-        f << "#include <gl/gl.h>\n"
-        f << "#include <gl/glu.h>\n\n"
+        f << "#include <OpenGL/gl.h>\n\n"
+        f << "#elif defined(__linux__)\n"
+        f << "#include <gl/gl.h>\n\n"
         f << "#endif\n\n"
       elsif @category_prefix == "WGL_"
-        f << "#include <windows.h>\n"
+        f << "#include <windows.h>\n\n"
         f << "#include <gl/gl.h>\n\n"
       end
 
       f << "#ifndef APIENTRY\n#define APIENTRY\n#endif\n"
       f << "#ifndef APIENTRYP\n#define APIENTRYP APIENTRY *\n#endif\n"
       f << "#ifndef GLAPI\n#define GLAPI extern\n#endif\n\n"
-      
+
       write_header_defines(f)
       write_header_function_prototypes(f)
-      
+
       f << "\ntypedef struct {\n"
-      f << "\tconst char *str;\n"
-      
+
       @spec.categories.sort.each do |category_name|
         next if category_name !~ /^(#{@spec.extension_group_names.join('|')})_/
         f << "\tint _#{@category_prefix}#{category_name} : 1;\n"
       end
-      
+
       f << "} #{basename}ext_t;\n\n";
-      
+
       f << "extern #{basename}ext_t #{basename}ext;\n\n"
-      
+
       if @category_prefix == "WGL_"
         f << "extern void #{basename}_init(HDC hdc, int enableDebug);\n"
       else
         f << "extern void #{basename}_init(int enableDebug);\n"
       end
       f << "extern void #{basename}_rebind(int enableDebug);\n"
-      
+
       f << "\n#ifdef __cplusplus\n}\n#endif\n\n"
       f << "#endif /* __#{basename.upcase}_H__ */\n"
     end
 
     puts "#{basename}.h generated"
   end
-  
+
   def write_header_defines(f)
     current_enum_label = nil
-    
+
     @spec.enumext_elements.each do |e|
       if e.name == :enum
         f << "#endif\n\n" if current_enum_label
@@ -192,13 +178,13 @@ TEXT
         end
       end
     end
-    
+
     f << "#endif\n\n"
   end
-  
+
   def write_header_function_prototypes(f)
     current_category = nil
-    
+
     @spec.glspec_elements.each do |e|
       case e.name
       when :passthru, :passend
@@ -208,10 +194,10 @@ TEXT
         current_category = e.data
       when :command
         command = e.data
-        
+
         next if $user_excluded_extensions.include?(command.category)
         next if !command.valid?($user_core_version)
-       
+
         f << "\n/* #{@category_prefix}#{command.category} */\n" if command.category != current_category
         current_category = command.category
 
@@ -228,15 +214,17 @@ TEXT
   def generate_source_file(basename)
     File.open("#{basename}.c", "w") do |f|
       write_license_comment(f, "#{basename}.c")
-      
+
       f << "\n#include \"#{basename}.h\"\n"
       f << "#include <string.h>\n\n"
       f << "extern void CheckGLError(const char *msg);\n"
-      f << "static int _#{$glgen_prefix}glBeginStarted = 0;\n"
+
+      if $user_core_version < 3.1
+        f << "static int _#{$glgen_prefix}glBeginStarted = 0;\n"
+      end
 
       write_source_gl_functions(f)
-      write_source_fake_functions(f)
-      
+
       f << "\n#ifdef _WIN32\n"
       f << "#define GPA(a) wglGetProcAddress(\#a)\n"
       f << "#elif defined(__APPLE__)\n"
@@ -245,42 +233,38 @@ TEXT
       f << "#elif defined(__linux__)\n"
       f << "#define GPA(a) glXGetProcAddressARB((const GLubyte *)\#a)\n"
       f << "#endif\n\n"
-      
+
       f << "#{basename}ext_t #{basename}ext;\n"
-      
+
       write_source_func_init(basename, f)
       write_source_func_rebind(basename, f)
     end
 
     puts "#{basename}.c generated"
   end
-  
+
   def write_source_gl_functions(f)
     current_category = nil
-    
+
     @spec.command_array.each do |command|
-      next if command.name =~ /^__/
       next if $user_excluded_extensions.include?(command.category)
       next if !command.valid?($user_core_version)
-      
+
       f << "\n/* #{@category_prefix}#{command.category} */\n" if command.category != current_category
       current_category = command.category
-      
+
       func_name = @command_prefix + command.name
-      
+
       if command.deprecated && command.deprecated.to_f <= $user_core_version
         f << "/* #{$glgen_prefix}#{func_name} DEPRECATED by #{command.deprecated} */\n"
       else
-        if command.core? && command.core_version <= 1.1
-          f << "#{command.return_type} (APIENTRY *#{$glgen_prefix}#{func_name})(#{command.params.join(", ")});\n"
-          call_name = func_name          
-        else
-          f << "typedef #{command.return_type} (APIENTRY *PFN#{func_name.upcase})(#{command.params.join(", ")});\n"          
-          f << "PFN#{func_name.upcase} #{$glgen_prefix}#{func_name};\n"
-          f << "static PFN#{func_name.upcase} _#{func_name};\n"
-          call_name = "_" + func_name
-        end
-        
+        # ggl function pointer
+        f << "typedef #{command.return_type} (APIENTRY *PFN#{func_name.upcase})(#{command.params.join(", ")});\n"
+        f << "PFN#{func_name.upcase} #{$glgen_prefix}#{func_name};\n"
+        f << "static PFN#{func_name.upcase} _#{func_name};\n"
+        call_name = "_" + func_name
+
+        # debug ggl function
         f << "static #{command.return_type} APIENTRY d_#{func_name}(#{command.params.join(", ")}) {\n"
 
         if command.return_type.casecmp("void") == 0
@@ -295,70 +279,48 @@ TEXT
         end
 
         f << ");\n"
-        
-        if func_name == "glBegin"
-          f << "\t_#{$glgen_prefix}glBeginStarted++;\n"
-        elsif func_name == "glEnd"
-          f << "\t_#{$glgen_prefix}glBeginStarted--;\n"
+
+        # glBegin/glEnd deprecated in version 3.1
+        if $user_core_version < 3.1
+          if func_name == "glBegin"
+            f << "\t_#{$glgen_prefix}glBeginStarted++;\n"
+          elsif func_name == "glEnd"
+            f << "\t_#{$glgen_prefix}glBeginStarted--;\n"
+          end
+
+          f << "\tif (!_#{$glgen_prefix}glBeginStarted) { CheckGLError(\"#{func_name}\"); }\n"
+        else
+          f << "\tCheckGLError(\"#{func_name}\");\n"
         end
 
-        f << "\tif (!_#{$glgen_prefix}glBeginStarted) { CheckGLError(\"#{func_name}\"); }\n"
         f << "\treturn ret;\n" if command.return_type.casecmp("void") != 0
         f << "}\n"
       end
     end
   end
-  
-  def write_source_fake_functions(f)
-    if @category_prefix == "GL_"
-      f << "\n#ifdef GL_VERSION_2_0\n"
-         
-      f << "void gl__DeleteObject(GLhandleARB obj) {\n"
-      f << "\tif (glIsShader(obj)) { glDeleteShader(obj); }\n"
-      f << "\telse { glDeleteProgram(obj); }\n"
-      f << "}\n"
-    
-      f << "void gl__GetObjectParameteriv(GLuint obj, GLenum pname, GLint* params) {\n"
-      f << "\tif (glIsShader(obj)) { glGetShaderiv(obj, pname, params); }\n"
-      f << "\telse { glGetProgramiv(obj, pname, params); }\n"
-      f << "}\n"
-    
-      f << "void gl__GetInfoLog(GLuint obj, GLsizei bufSize, GLsizei* length, GLchar* infoLog) {\n"
-      f << "\tif (glIsShader(obj)) { glGetShaderInfoLog(obj, bufSize, length, infoLog); }\n"
-      f << "\telse { glGetProgramInfoLog(obj, bufSize, length, infoLog); }\n"
-      f << "}\n"
-    
-      f << "#else\n"
-    
-      f << "void gl__DeleteProgramARB(GLhandleARB program) {\n"
-      f << "\t_glDeleteObjectARB(program);\n"
-      f << "}\n"
-    
-      f << "void gl__DeleteShaderARB(GLhandleARB shader) {\n"
-      f << "\t_glDeleteObjectARB(shader);\n"
-      f << "}\n"
-    
-      f << "void gl__GetProgramivARB(GLuint program, GLenum pname, GLint* params) {\n"
-      f << "\t_glGetObjectParameterivARB(program, pname, params);\n"
-      f << "}\n"
-    
-      f << "void gl__GetShaderivARB(GLuint shader, GLenum pname, GLint* params) {\n"
-      f << "\t_glGetObjectParameterivARB(shader, pname, params);\n"
-      f << "}\n"
-    
-      f << "void gl__GetProgramInfoLogARB(GLuint program, GLsizei bufSize, GLsizei* length, GLchar* infoLog) {\n"
-      f << "\t_glGetInfoLogARB(program, bufSize, length, infoLog);\n"
-      f << "}\n"
-    
-      f << "void gl__GetShaderInfoLogARB(GLuint shader, GLsizei bufSize, GLsizei* length, GLchar* infoLog) {\n"
-      f << "\t_glGetInfoLogARB(shader, bufSize, length, infoLog);\n"
-      f << "}\n"
-    
-      f << "#endif\n"
-    end
-  end
-  
+
   def write_source_func_init(basename, f)
+    if @category_prefix == "WGL_" || $user_core_version < 3.1
+      f << "static const char *#{basename}ext_str = NULL;\n"
+    else
+      f << "static GLint #{basename}ext_count = 0;\n"
+    end
+
+    f << "\nstatic int #{basename}_check_extension(const char *ext) {\n"
+
+    if @category_prefix == "WGL_" || $user_core_version < 3.1
+      f << "\treturn strstr(#{basename}ext_str, ext) ? 1 : 0;\n"
+    else
+      f << "\tfor (GLint i = 0; i < #{basename}ext_count; i++) {\n"
+      f << "\t\tif (!strcmp((const char *)_glGetStringi(GL_EXTENSIONS, i), ext)) {\n";
+      f << "\t\t\treturn 1;\n"
+      f << "\t\t}\n"
+      f << "\t}\n"
+      f << "\treturn 0;\n"
+    end
+
+    f << "}\n"
+
     if @category_prefix == "WGL_"
       f << "\nvoid #{basename}_init(HDC hdc, int enableDebug) {\n"
     else
@@ -367,80 +329,23 @@ TEXT
 
     current_category = nil
     temp_commands = []
-    
+
     print_temp_commands = lambda do
       f << "\t/* #{@category_prefix}#{temp_commands[0].category} */\n"
-      
-      if temp_commands[0].core? && temp_commands[0].core_version > 1.1
-        f << "#ifdef #{@category_prefix}VERSION_#{temp_commands[0].core_version.to_s.sub('.', '_')}\n"
-        
-        temp_commands.each do |c| 
-          func_name = @command_prefix + c.name
-          f << "\t_#{func_name} = #{@command_prefix}#{c.name};\n"
-        end
-        
-        f << "#else\n"
-       
-        temp_commands.each do |c|
-          func_name = @command_prefix + c.name
-          if c.original
-            if c.original.name =~ /^__/
-              f << "\t_#{func_name} = #{@command_prefix}#{c.original.name};\n"
-            else
-              f << "\t_#{func_name} = (PFN#{func_name.upcase})GPA(#{@command_prefix}#{c.original.name});\n"
-            end
-          else
-            puts "WARNING: missing original command #{c.name}"
+
+      if temp_commands[0].core?
+        if temp_commands[0].core_version == 1.0
+          temp_commands.each do |c|
+            func_name = @command_prefix + c.name
+            f << "\t_#{func_name} = #{@command_prefix}#{c.name};\n"
+          end
+        elsif temp_commands[0].core_version <= $user_core_version
+          temp_commands.each do |c|
+            func_name = @command_prefix + c.name
+            f << "\t_#{func_name} = (PFN#{func_name.upcase})GPA(#{func_name});\n"
           end
         end
-        
-        f << "#endif\n"
-      elsif temp_commands[0].extension?          
-        current_alias_category = nil
-        temp_extension_commands = []
-        
-        print_temp_extension_commands = lambda do
-          if (a_command = temp_extension_commands[0].aliased) && a_command.core?
-            f << "#ifndef #{@category_prefix}VERSION_#{a_command.core_version.to_s.sub('.', '_')}\n"
-            
-            temp_extension_commands.each do |c|
-              if (a_command = c.aliased)
-                func_name = @command_prefix + c.name
-                f << "\t_#{func_name} = (PFN#{func_name.upcase})GPA(#{func_name});\n"
-              end
-            end              
-          
-            f << "#else\n"
-          
-            temp_extension_commands.each do |c|
-              if (a_command = c.aliased)
-                func_name = @command_prefix + c.name
-                f << "\t_#{func_name} = #{@command_prefix}#{a_command.name};\n"
-              end
-            end
-          
-            f << "#endif\n"
-          else            
-            temp_extension_commands.each do |c|
-             func_name = @command_prefix + c.name
-             f << "\t_#{func_name} = (PFN#{func_name.upcase})GPA(#{func_name});\n"
-            end
-          end
-        end # lambda
-        
-        # sorted by aliased command category
-        temp_commands.sort_by { |c| (a_command = c.aliased) ? a_command.category : "" }.each do |c|
-          if current_alias_category != ((a_command = c.aliased) ? a_command.category : "")
-            print_temp_extension_commands.call if !temp_extension_commands.empty?
-            temp_extension_commands.clear
-          end
-          
-          temp_extension_commands << c
-          current_alias_category = ((a_command = c.aliased) ? a_command.category : "")
-        end
-        
-        print_temp_extension_commands.call if !temp_extension_commands.empty?                
-      elsif temp_commands[0].core_extension?
+      elsif temp_commands[0].extension?
         temp_commands.each do |c|
           func_name = @command_prefix + c.name
           f << "\t_#{func_name} = (PFN#{func_name.upcase})GPA(#{func_name});\n"
@@ -448,67 +353,69 @@ TEXT
       end
     end # lambda
 
+    # commands in command_array is already sorted by spec file source
     @spec.command_array.each do |command|
-      next if command.name =~ /^__/
-      next if command.core? && command.core_version <= 1.1
       next if $user_excluded_extensions.include?(command.category)
       next if !command.valid?($user_core_version)
-      
+      next if command.deprecated && command.deprecated.to_f <= $user_core_version
+
       if command.category != current_category
         print_temp_commands.call if !temp_commands.empty?
         temp_commands.clear
       end
-      
+
       temp_commands << command
       current_category = command.category
     end
-    
+
     print_temp_commands.call if !temp_commands.empty?
 
     f << "\t#{basename}_rebind(enableDebug);\n"
     f << "\n"
 
+    if @category_prefix == "WGL_"
+      f << "\t#{basename}ext_str = (const char *)_wglGetExtensionsStringARB(hdc);\n"
+    elsif $user_core_version < 3.1
+      f << "\t#{basename}ext_str = (const char *)_glGetString(GL_EXTENSIONS);\n"
+    else
+      f << "\t_glGetIntegerv(GL_NUM_EXTENSIONS, &#{basename}ext_count);\n"
+    end
+
     f << "\tmemset(&#{basename}ext, 0, sizeof(#{basename}ext));\n"
 
-    if @category_prefix == "WGL_"
-      f << "\t#{basename}ext.str = (const char *)gwglGetExtensionsStringARB(hdc);\n"
-    else
-      f << "\t#{basename}ext.str = (const char *)glGetString(GL_EXTENSIONS);\n"
-    end    
-    
     @spec.categories.sort.each do |category_name|
       next if category_name !~ /^(#{@spec.extension_group_names.join('|')})_/
-      f << "\tif (strstr(#{basename}ext.str, \"#{@category_prefix}#{category_name}\")) #{basename}ext._#{@category_prefix}#{category_name} = 1;\n"
+      f << "\tif (#{basename}_check_extension(\"#{@category_prefix}#{category_name}\")) #{basename}ext._#{@category_prefix}#{category_name} = 1;\n"
     end
-    
+
     f << "}\n\n"
   end
-  
+
   def write_source_func_rebind(basename, f)
     f << "void #{basename}_rebind(int enableDebug) {\n"
     f << "\tif (!enableDebug) {\n"
-    
+
     @spec.command_array.each do |command|
-      next if command.name =~ /^__/
       next if $user_excluded_extensions.include?(command.category)
       next if !command.valid?($user_core_version)
+      next if command.deprecated && command.deprecated.to_f <= $user_core_version
 
       func_name = @command_prefix + command.name
-      f << "\t\t#{$glgen_prefix}#{func_name} = %s#{func_name};\n" % (command.core? && command.core_version <= 1.1 ? "" : "_")
+      f << "\t\t#{$glgen_prefix}#{func_name} = _#{func_name};\n"
     end
-    
+
     f << "\t}\n"
     f << "\telse {\n"
-    
+
     @spec.command_array.each do |command|
-      next if command.name =~ /^__/
       next if $user_excluded_extensions.include?(command.category)
       next if !command.valid?($user_core_version)
-      
-      func_name = @command_prefix + command.name   
+      next if command.deprecated && command.deprecated.to_f <= $user_core_version
+
+      func_name = @command_prefix + command.name
       f << "\t\t#{$glgen_prefix}#{func_name} = d_#{func_name};\n"
     end
-    
+
     f << "\t}\n"
     f << "}\n"
   end
@@ -550,10 +457,13 @@ puts "trying to generate OpenGL C glue code based on OpenGL version #{$user_core
 
 #-------------------------------------------------------------------------------
 
+#registry_url = "http://www.opengl.org/registry/api"
+registry_url = "https://cvs.khronos.org/svn/repos/ogl/trunk/doc/registry/public/oldspecs"
+
 spec = GLSpec.new(
-  :typemap => "http://www.opengl.org/registry/api/gl.tm",
-  :enumext => "http://www.opengl.org/registry/api/enumext.spec",
-  :glspec  => "http://www.opengl.org/registry/api/gl.spec"
+  :typemap => "#{registry_url}/gl.tm",
+  :enumext => "#{registry_url}/enumext.spec",
+  :glspec  => "#{registry_url}/gl.spec"
 )
 
 gen = GLGenerator.new(spec, "GL_", "gl", "GL_")
@@ -561,52 +471,20 @@ gen = GLGenerator.new(spec, "GL_", "gl", "GL_")
 # we'll ignore this function
 gen.spec.del_command("StencilMaskSeparate")
 
-# add fake functions to make all them happy
-add_arb_shader_command = lambda do | command_name, o_command_name |
-  o_command = gen.spec.find_command(o_command_name)
-  command = gen.spec.new_command(command_name)      
-  command.category = "ARB_shader_objects"
-  command.alias = o_command.name
-  command.return_type = o_command.return_type
-  command.params = o_command.params
-  gen.spec.find_command(command.alias).original = command
-end
-
-add_arb_shader_command.call("__DeleteProgramARB", "DeleteProgram")
-add_arb_shader_command.call("__DeleteShaderARB", "DeleteShader")
-add_arb_shader_command.call("__GetProgramivARB", "GetProgramiv")
-add_arb_shader_command.call("__GetShaderivARB", "GetShaderiv")
-add_arb_shader_command.call("__GetProgramInfoLogARB", "GetProgramInfoLog")
-add_arb_shader_command.call("__GetShaderInfoLogARB", "GetShaderInfoLog")
-add_arb_shader_command.call("__IsShaderARB", "IsShader")
-
-add_core_shader_command = lambda do | command_name, o_command_name |
-  o_command = gen.spec.find_command(o_command_name)
-  command = gen.spec.new_command(command_name)      
-  command.category = "VERSION_2_0"
-  command.return_type = o_command.return_type
-  command.params = o_command.params
-  command.original = gen.spec.find_command(o_command_name)
-  o_command.alias = command_name
-end
-
-add_core_shader_command.call("__DeleteObject", "DeleteObjectARB")    
-add_core_shader_command.call("__GetObjectParameteriv", "GetObjectParameterivARB")
-add_core_shader_command.call("__GetInfoLog", "GetInfoLogARB")
-
+=begin
 [ "FramebufferTextureARB",
   "VertexAttribDivisorARB",
   "GetBufferParameterivARB",
-  "GetConvolutionFilterEXT", 
-  "GetConvolutionParameterfvEXT", 
+  "GetConvolutionFilterEXT",
+  "GetConvolutionParameterfvEXT",
   "GetConvolutionParameterivEXT",
-  "GetSeparableFilterEXT", 
-  "GetHistogramEXT", 
+  "GetSeparableFilterEXT",
+  "GetHistogramEXT",
   "GetHistogramParameterfvEXT",
-  "GetHistogramParameterivEXT", 
-  "GetMinmaxParameterivEXT", 
+  "GetHistogramParameterivEXT",
+  "GetMinmaxParameterivEXT",
   "GetMinmaxEXT",
-  "GetMinmaxParameterfvEXT", 
+  "GetMinmaxParameterfvEXT",
   "GetMinmaxParameterfiEXT",
   "AreTexturesResidentEXT",
   "BindTextureEXT",
@@ -621,22 +499,23 @@ add_core_shader_command.call("__GetInfoLog", "GetInfoLogARB")
     gen.spec.find_command(command.alias).original = command
   end
 end
+=end
 
 gen.generate_header_and_source_file("#{$glgen_prefix}gl")
 
 spec = GLSpec.new(
-  :typemap => "http://www.opengl.org/registry/api/glx.tm",
-  :enumext => "http://www.opengl.org/registry/api/glxenumext.spec",
-  :glspec  => "http://www.opengl.org/registry/api/glxext.spec"
+  :typemap => "#{registry_url}/glx.tm",
+  :enumext => "#{registry_url}/glxenumext.spec",
+  :glspec  => "#{registry_url}/glxext.spec"
 )
 
 gen = GLGenerator.new(spec, "GLX_", "glX", "GLX_")
 gen.generate_header_and_source_file("#{$glgen_prefix}glx")
-  
+
 spec = GLSpec.new(
-  :typemap => "http://www.opengl.org/registry/api/wgl.tm",
-  :enumext => "http://www.opengl.org/registry/api/wglenumext.spec",
-  :glspec  => "http://www.opengl.org/registry/api/wglext.spec"
+  :typemap => "#{registry_url}/wgl.tm",
+  :enumext => "#{registry_url}/wglenumext.spec",
+  :glspec  => "#{registry_url}/wglext.spec"
 )
 
 gen = GLGenerator.new(spec, "", "wgl", "WGL_")
