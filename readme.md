@@ -1,7 +1,7 @@
 About
 ============================
 
-GLGen is platform independent OpenGL API C glue code generator written in ruby.
+GenGGL is platform independent OpenGL API C glue code generator written in ruby.
 
 It will help you to write OpenGL C/C++ code with no concerning OpenGL versions and platforms. (not including OpenGL ES)
 
@@ -16,8 +16,8 @@ Usage
 ----------------------------
 First off, needed ruby 1.9 in system for use
 
-	$ cd glgen
-	$ ruby glgen.rb <core-version>
+	$ cd genggl
+	$ ruby genggl.rb <core-version>
 
 Specify OpenGL core version at <core-version> (default: 1.1)
 
@@ -34,21 +34,21 @@ Usage about ggl (generated C code)
 
 	extern gglext_t gglext;
 
-	extern void ggl_init(int enableDebug);	
+	extern void ggl_init(int enableDebug);
 	extern void ggl_rebind(int enableDebug);
 
 ##gwgl.h (for windows extension)##
 
 	extern gwglext_t gwglext;
 
-	extern void gwgl_init(HDC hdc, int enableDebug);	
+	extern void gwgl_init(HDC hdc, int enableDebug);
 	extern void gwgl_rebind(int enableDebug);
 
 ##gglx.h (for linux extension)##
 
 	extern gglxext_t gglxext;
 
-	extern void gglx_init(int enableDebug);	
+	extern void gglx_init(int enableDebug);
 	extern void gglx_rebind(int enableDebug);
 
 Callback functions
@@ -56,7 +56,7 @@ Callback functions
 	/* if you want check GL error, you should set enableDebug as true when calling ggl_bind */
 	void CheckGLError(const char *msg)
 	{
-    	... 
+    	...
 	}
 
 	/* you should provide dynamic function getter (just like GetProcAddress in windows) for Mac OS X for now (0.1) */
