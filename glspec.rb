@@ -1,8 +1,8 @@
 #----------------------------------------------------------------------------------------------
 #
 # glspec.rb
-# GLgen (OpenGL extension C glue code generator)
-# Version: 0.2.1
+# GenGGL (OpenGL extension glue code generator in C)
+# Version: 0.2.2
 #
 # Copyright 2010 Ju Hyung Lee. All rights reserved.
 #

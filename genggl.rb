@@ -1,8 +1,8 @@
 #----------------------------------------------------------------------------------------------
 #
-# glgen.rb
-# GLgen (OpenGL C glue code generator)
-# Version: 0.2.1
+# genggl.rb
+# GenGGL (OpenGL extension glue code generator in C)
+# Version: 0.2.2
 #
 # Copyright 2010 Ju Hyung Lee. All rights reserved.
 #
@@ -32,8 +32,8 @@
 #
 #----------------------------------------------------------------------------------------------
 
-$glgen_version_string = "0.2.1"
-$glgen_prefix = "g"
+$genggl_version_string = "0.2.2"
+$genggl_prefix = "g"
 
 #require 'profile'
 require 'rbconfig'
@@ -41,7 +41,7 @@ require './glspec.rb'
 
 include RbConfig
 
-class GLGenerator
+class GGLGenerator
   attr_reader :spec
 
   def initialize(spec, enum_prefix, command_prefix, category_prefix)
@@ -56,8 +56,8 @@ class GLGenerator
 /*********************************************************************************************
  *
  * #{filename}
- * #{$glgen_prefix}gl (OpenGL glue code library)
- * Version: #{$glgen_version_string}
+ * #{$genggl_prefix}gl (OpenGL glue code library)
+ * Version: #{$genggl_version_string}
  *
  * Copyright 2011 Ju Hyung Lee. All rights reserved.
  *
@@ -125,7 +125,7 @@ TEXT
       write_header_defines(f)
       write_header_function_prototypes(f)
 
-      f << "typedef struct {\n"
+      f << "\ntypedef struct {\n"
 
       @spec.categories.sort.each do |category_name|
         next if category_name !~ /^(#{@spec.extension_group_names.join('|')})_/
@@ -219,9 +219,9 @@ TEXT
         end
 
         if command.deprecated && command.deprecated.to_f <= $user_core_version
-          f << "/* #{$glgen_prefix}#{@command_prefix}#{command.name} DEPRECATED by #{command.deprecated} */\n"
+          f << "/* #{$genggl_prefix}#{@command_prefix}#{command.name} DEPRECATED by #{command.deprecated} */\n"
         else
-          f << "extern #{command.return_type} (APIENTRY *#{$glgen_prefix}#{@command_prefix}#{command.name})(#{command.params.join(", ")});\n"
+          f << "extern #{command.return_type} (APIENTRY *#{$genggl_prefix}#{@command_prefix}#{command.name})(#{command.params.join(", ")});\n"
         end
       end
     end
@@ -236,7 +236,7 @@ TEXT
       f << "extern void CheckGLError(const char *msg);\n"
 
       if $user_core_version < 3.1
-        f << "static int _#{$glgen_prefix}glBeginStarted = 0;\n"
+        f << "static int _#{$genggl_prefix}glBeginStarted = 0;\n"
       end
 
       write_source_gl_functions(f)
@@ -272,11 +272,11 @@ TEXT
       func_name = @command_prefix + command.name
 
       if command.deprecated && command.deprecated.to_f <= $user_core_version
-        f << "/* #{$glgen_prefix}#{func_name} DEPRECATED by #{command.deprecated} */\n"
+        f << "/* #{$genggl_prefix}#{func_name} DEPRECATED by #{command.deprecated} */\n"
       else
         # ggl function pointer
         f << "typedef #{command.return_type} (APIENTRY *PFN#{func_name.upcase})(#{command.params.join(", ")});\n"
-        f << "PFN#{func_name.upcase} #{$glgen_prefix}#{func_name};\n"
+        f << "PFN#{func_name.upcase} #{$genggl_prefix}#{func_name};\n"
         f << "static PFN#{func_name.upcase} _#{func_name};\n"
         call_name = "_" + func_name
 
@@ -299,12 +299,12 @@ TEXT
         # glBegin/glEnd deprecated in version 3.1
         if $user_core_version < 3.1
           if func_name == "glBegin"
-            f << "\t_#{$glgen_prefix}glBeginStarted++;\n"
+            f << "\t_#{$genggl_prefix}glBeginStarted++;\n"
           elsif func_name == "glEnd"
-            f << "\t_#{$glgen_prefix}glBeginStarted--;\n"
+            f << "\t_#{$genggl_prefix}glBeginStarted--;\n"
           end
 
-          f << "\tif (!_#{$glgen_prefix}glBeginStarted) { CheckGLError(\"#{func_name}\"); }\n"
+          f << "\tif (!_#{$genggl_prefix}glBeginStarted) { CheckGLError(\"#{func_name}\"); }\n"
         else
           f << "\tCheckGLError(\"#{func_name}\");\n"
         end
@@ -417,7 +417,7 @@ TEXT
       next if command.deprecated && command.deprecated.to_f <= $user_core_version
 
       func_name = @command_prefix + command.name
-      f << "\t\t#{$glgen_prefix}#{func_name} = _#{func_name};\n"
+      f << "\t\t#{$genggl_prefix}#{func_name} = _#{func_name};\n"
     end
 
     f << "\t}\n"
@@ -429,7 +429,7 @@ TEXT
       next if command.deprecated && command.deprecated.to_f <= $user_core_version
 
       func_name = @command_prefix + command.name
-      f << "\t\t#{$glgen_prefix}#{func_name} = d_#{func_name};\n"
+      f << "\t\t#{$genggl_prefix}#{func_name} = d_#{func_name};\n"
     end
 
     f << "\t}\n"
@@ -452,7 +452,7 @@ end
 valid_core_version_numbers = [1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 2.1, 3.0, 3.1, 3.2, 3.3, 4.0, 4.1, 4.2, 4.3]
 
 if ARGV[0] == "--help"
-  puts "Usage: glgen <core-version>"
+  puts "Usage: genggl <core-version>"
   puts "core-version: one of the #{valid_core_version_numbers.join(", ")} (if not specified default is 1.1)"
   exit
 end
@@ -468,8 +468,8 @@ if File.exist?("excluded_extensions.txt")
   $user_excluded_extensions = IO.readlines("excluded_extensions.txt").map { |x| x.strip }.uniq
 end
 
-puts "GLGen Version: #{$glgen_version_string}"
-puts "trying to generate OpenGL C glue code based on OpenGL version #{$user_core_version}"
+puts "GenGGL Version: #{$genggl_version_string}"
+puts "trying to generate GGL based on core version #{$user_core_version}"
 
 #-------------------------------------------------------------------------------
 
@@ -482,7 +482,7 @@ spec = GLSpec.new(
   :glspec  => "#{registry_url}/gl.spec"
 )
 
-gen = GLGenerator.new(spec, "GL_", "gl", "GL_")
+gen = GGLGenerator.new(spec, "GL_", "gl", "GL_")
 
 # we'll ignore this function
 gen.spec.del_command("StencilMaskSeparate")
@@ -517,7 +517,7 @@ gen.spec.del_command("StencilMaskSeparate")
 end
 =end
 
-gen.generate_header_and_source_file("#{$glgen_prefix}gl")
+gen.generate_header_and_source_file("#{$genggl_prefix}gl")
 
 spec = GLSpec.new(
   :typemap => "#{registry_url}/glx.tm",
@@ -525,8 +525,8 @@ spec = GLSpec.new(
   :glspec  => "#{registry_url}/glxext.spec"
 )
 
-gen = GLGenerator.new(spec, "GLX_", "glX", "GLX_")
-gen.generate_header_and_source_file("#{$glgen_prefix}glx")
+gen = GGLGenerator.new(spec, "GLX_", "glX", "GLX_")
+gen.generate_header_and_source_file("#{$genggl_prefix}glx")
 
 spec = GLSpec.new(
   :typemap => "#{registry_url}/wgl.tm",
@@ -534,5 +534,5 @@ spec = GLSpec.new(
   :glspec  => "#{registry_url}/wglext.spec"
 )
 
-gen = GLGenerator.new(spec, "", "wgl", "WGL_")
-gen.generate_header_and_source_file("#{$glgen_prefix}wgl")
+gen = GGLGenerator.new(spec, "", "wgl", "WGL_")
+gen.generate_header_and_source_file("#{$genggl_prefix}wgl")
