@@ -2,7 +2,7 @@
 #
 # glgen.rb
 # GLgen (OpenGL C glue code generator)
-# Version: 0.2.0
+# Version: 0.2.1
 #
 # Copyright 2010 Ju Hyung Lee. All rights reserved.
 #
@@ -32,7 +32,7 @@
 #
 #----------------------------------------------------------------------------------------------
 
-$glgen_version_string = "0.2.0"
+$glgen_version_string = "0.2.1"
 $glgen_prefix = "g"
 
 #require 'profile'
@@ -57,7 +57,7 @@ class GLGenerator
  *
  * #{filename}
  * #{$glgen_prefix}gl (OpenGL glue code library)
- * Version: 0.1.2
+ * Version: #{$glgen_version_string}
  *
  * Copyright 2011 Ju Hyung Lee. All rights reserved.
  *
@@ -114,7 +114,7 @@ TEXT
         f << "#include <gl/gl.h>\n\n"
         f << "#endif\n\n"
       elsif @category_prefix == "WGL_"
-        f << "#include <windows.h>\n\n"
+        f << "#include <windows.h>\n"
         f << "#include <gl/gl.h>\n\n"
       end
 
@@ -125,7 +125,7 @@ TEXT
       write_header_defines(f)
       write_header_function_prototypes(f)
 
-      f << "\ntypedef struct {\n"
+      f << "typedef struct {\n"
 
       @spec.categories.sort.each do |category_name|
         next if category_name !~ /^(#{@spec.extension_group_names.join('|')})_/
@@ -158,15 +158,16 @@ TEXT
         f << "#endif\n\n" if current_enum_label
         current_enum_label = e.data
 
-#         if e.data =~ /VERSION_(\d+_\d+)/
-#          v = $1.sub('_', '.').to_f
-#          if v <= 1.1 || v > $user_core_version
-#            current_enum_label = nil
-#            next
-#          end
-#        end
+        if e.data =~ /VERSION_(\d+_\d+)/
+          if $1.sub('_', '.').to_f > $user_core_version
+            current_enum_label = nil
+            next
+          end
+        end
 
-        f << "#ifndef #{@enum_prefix}#{current_enum_label}\n"
+        category_name = "#{@enum_prefix}#{current_enum_label}"
+
+        f << "#ifndef #{category_name}\n"
       elsif current_enum_label
         case e.name
         when :define
@@ -179,7 +180,7 @@ TEXT
       end
     end
 
-    f << "#endif\n\n"
+    f << "#endif\n\n" if current_enum_label
   end
 
   def write_header_function_prototypes(f)
@@ -188,25 +189,40 @@ TEXT
     @spec.glspec_elements.each do |e|
       case e.name
       when :passthru, :passend
-        f << e.data
+        if e.data =~ /^typedef unsigned int GLhandleARB;/
+          f << "#ifdef __APPLE__\n"
+          f << "typedef void *GLhandleARB;\n"
+          f << "#else\n"
+          f << "typedef unsigned int GLhandleARB;\n"
+          f << "#endif\n"
+        else
+          f << e.data
+        end
       when :newcategory
-        f << "\n/* #{@category_prefix}#{e.data} */\n"
         current_category = e.data
+
+        category_name = "#{@category_prefix}#{current_category}"
+
+        f << "\n/* #{category_name} */\n"
       when :command
         command = e.data
 
         next if $user_excluded_extensions.include?(command.category)
         next if !command.valid?($user_core_version)
 
-        f << "\n/* #{@category_prefix}#{command.category} */\n" if command.category != current_category
-        current_category = command.category
+        if command.category != current_category
+          category_name = "#{@category_prefix}#{command.category}"
+
+          f << "\n/* #{category_name} */\n"
+
+          current_category = command.category
+        end
 
         if command.deprecated && command.deprecated.to_f <= $user_core_version
           f << "/* #{$glgen_prefix}#{@command_prefix}#{command.name} DEPRECATED by #{command.deprecated} */\n"
         else
           f << "extern #{command.return_type} (APIENTRY *#{$glgen_prefix}#{@command_prefix}#{command.name})(#{command.params.join(", ")});\n"
         end
-      else
       end
     end
   end
