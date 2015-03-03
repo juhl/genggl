@@ -349,25 +349,18 @@ TEXT
     print_temp_commands = lambda do
       f << "\t/* #{@category_prefix}#{temp_commands[0].category} */\n"
 
-      if temp_commands[0].core?
-        if temp_commands[0].core_version == 1.0
-          temp_commands.each do |c|
-            func_name = @command_prefix + c.name
-            f << "\t_#{func_name} = #{@command_prefix}#{c.name};\n"
-          end
-        elsif temp_commands[0].core_version <= $user_core_version
-          temp_commands.each do |c|
-            func_name = @command_prefix + c.name
-            f << "\t_#{func_name} = (PFN#{func_name.upcase})GPA(#{func_name});\n"
-          end
+      if temp_commands[0].core? && temp_commands[0].core_version == 1.0
+        temp_commands.each do |c|
+          func_name = @command_prefix + c.name
+          f << "\t_#{func_name} = #{@command_prefix}#{c.name};\n"
         end
-      elsif temp_commands[0].extension?
+      elsif temp_commands[0].valid?($user_core_version)
         temp_commands.each do |c|
           func_name = @command_prefix + c.name
           f << "\t_#{func_name} = (PFN#{func_name.upcase})GPA(#{func_name});\n"
         end
       end
-    end # lambda
+    end
 
     # commands in command_array is already sorted by spec file source
     @spec.command_array.each do |command|
