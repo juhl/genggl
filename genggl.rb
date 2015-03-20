@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------------------------------
 #
-# genggl2.rb
+# genggl.rb
 # GenGGL (OpenGL extension glue code generator in C)
 # Version: 0.3.0
 #

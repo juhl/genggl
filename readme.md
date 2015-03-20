@@ -19,7 +19,7 @@ First off, you need ruby 2.0 in system for use.
 	$ cd genggl
 	$ ruby genggl.rb <api> <version>
 
-You should specify profile one of the GL, COMPATIBILITY, ES and version
+You should specify profile one of the GL, COMPATIBILITY, ES and version. 
 After that, you could get ggl.h, ggl.c, gglx.h, gglx.c, gwgl.h, gwgl.c
 
 Usage about ggl (generated C code)

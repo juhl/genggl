@@ -1,6 +1,6 @@
 #----------------------------------------------------------------------------------------------
 #
-# glxml.rb
+# glspec.rb
 # GenGGL (OpenGL extension glue code generator in C)
 # Version: 0.3.0
 #
