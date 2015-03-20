@@ -219,10 +219,12 @@ class GLSpec
       @commands << command = GLCommand.new(command_name, command_return_type)
 
       command_tag.xpath("param").each do |param_tag|
-        command_group_name = param_tag['group']
-        command_name = param_tag.at('name').content
+        param_group_name = param_tag['group']
+        param_name = param_tag.at('name').content
 
-        param = GLCommandParam.new(command_name, param_tag.content, command_group_name)
+        param_name = 'z' + param_name if param_name == 'near' || param_name == 'far'
+
+        param = GLCommandParam.new(param_name, param_tag.content, param_group_name)
         command.params << param
       end
 
