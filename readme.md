@@ -1,34 +1,32 @@
-About
+GenGGL 0.3.0
 ============================
 
 GenGGL is platform independent OpenGL API C glue code generator written in ruby.
 
-It will help you to write OpenGL C/C++ code with no concerning OpenGL versions and platforms. (not including OpenGL ES)
+It will help you to write OpenGL C/C++ code without concerning OpenGL versions and platforms.
 
 Features
 ----------------------------
 
-* Platform independent binding to specific OpenGL version. (you can specify version as argument)
-* Parsing [OpenGL registry](http://www.opengl.org/registry) spec files as source for up-to-date API.
-* There is debug functionality for OpenGL function call.
+* Platform independent bindings to specific OpenGL profile and version. (you can specify it with argument)
+* Parsing [OpenGL registry](http://www.opengl.org/registry) XML files as source to generate up-to-date API.
+* There is debug functionalities for OpenGL function calls.
 
 Usage
 ----------------------------
-First off, needed ruby 1.9 in system for use
+First off, you need ruby 2.0 in system for use. 
 
 	$ cd genggl
-	$ ruby genggl.rb <core-version>
+	$ ruby genggl.rb <api> <version>
 
-Specify OpenGL core version at <core-version> (default: 1.1)
-
-And then, you could get ggl.h, ggl.c, gglx.h, gglx.c, gwgl.h, gwgl.c
+You should specify profile one of the GL, COMPATIBILITY, ES and version
+After that, you could get ggl.h, ggl.c, gglx.h, gglx.c, gwgl.h, gwgl.c
 
 Usage about ggl (generated C code)
 ----------------------------
 * ggl_init: initialize ggl function pointers for use.
 * ggl_rebind: re-bind ggl function pointers for debug purpose
-* you can check extensions easily with provided struct. (ex. gglext._GL_EXT_texture3D)
-* there are additional platform dependent version. (similar as above)
+* you can check extensions easily with provided extension struct. (ex. gglext._GL_EXT_texture3D)
 
 ##ggl.h##
 

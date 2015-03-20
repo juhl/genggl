@@ -1,8 +1,8 @@
 #----------------------------------------------------------------------------------------------
 #
-# genggl.rb
+# genggl2.rb
 # GenGGL (OpenGL extension glue code generator in C)
-# Version: 0.2.2
+# Version: 0.3.0
 #
 # Copyright 2010 Ju Hyung Lee. All rights reserved.
 #
@@ -32,7 +32,7 @@
 #
 #----------------------------------------------------------------------------------------------
 
-$genggl_version_string = "0.2.2"
+$genggl_version_string = "0.3.0"
 $genggl_prefix = "g"
 
 #require 'profile'
@@ -42,13 +42,15 @@ require './glspec.rb'
 include RbConfig
 
 class GGLGenerator
-  attr_reader :spec
+  attr_reader :spec, :has_glBegin, :has_GL_NUM_EXTENSIONS
 
-  def initialize(spec, enum_prefix, command_prefix, category_prefix)
-    @enum_prefix = enum_prefix
-    @command_prefix = command_prefix
-    @category_prefix = category_prefix
+  def initialize(spec)
     @spec = spec
+
+    # glBegin/glEnd deprecated in version core 3.1
+    @has_glBegin = @spec.commands.find { |x| x.name == "glBegin" && x.required }
+    # GL_NUM_EXTENSIONS
+    @has_GL_NUM_EXTENSIONS = @spec.enums.find { |x| x.name == "GL_NUM_EXTENSIONS" && x.required }
   end
 
   def write_license_comment(f, filename)
@@ -90,20 +92,22 @@ TEXT
     f << text
   end
 
-  def generate_header_and_source_file(basename)
-    generate_header_file(basename)
-    generate_source_file(basename)
+  def generate_header_and_source_file(dirname, basename)
+    Dir.mkdir(dirname) unless File.exists?(dirname)
+
+    generate_header_file(dirname, basename)
+    generate_source_file(dirname, basename)
   end
 
-  def generate_header_file(basename)
-    File.open("#{basename}.h", "w") do |f|
+  def generate_header_file(dirname, basename)
+    File.open("#{dirname}/#{basename}.h", "w") do |f|
       write_license_comment(f, "#{basename}.h")
 
       f << "\n#ifndef __#{basename.upcase}_H__\n"
       f << "#define __#{basename.upcase}_H__\n\n"
       f << "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n"
 
-      if @category_prefix == "GL_"
+      if @spec.api == "gl"
         f << "#ifdef _WIN32\n\n"
         f << "#include <windows.h>\n"
         f << "#include <gl/gl.h>\n\n"
@@ -113,7 +117,7 @@ TEXT
         f << "#elif defined(__linux__)\n"
         f << "#include <gl/gl.h>\n\n"
         f << "#endif\n\n"
-      elsif @category_prefix == "WGL_"
+      elsif @spec.api == "wgl"
         f << "#include <windows.h>\n"
         f << "#include <gl/gl.h>\n\n"
       end
@@ -122,21 +126,22 @@ TEXT
       f << "#ifndef APIENTRYP\n#define APIENTRYP APIENTRY *\n#endif\n"
       f << "#ifndef GLAPI\n#define GLAPI extern\n#endif\n\n"
 
-      write_header_defines(f)
-      write_header_function_prototypes(f)
+      write_header_types(f)
+      write_header_features(f)
+      write_header_extensions(f)
 
-      f << "\ntypedef struct {\n"
+      f << "/* #{@spec.extensions.count} extensions */\n"
+      f << "typedef struct {\n"
 
-      @spec.categories.sort.each do |category_name|
-        next if category_name !~ /^(#{@spec.extension_group_names.join('|')})_/
-        f << "\tint _#{@category_prefix}#{category_name} : 1;\n"
+      @spec.extensions.each do |extension|
+        f << "\tint _#{extension.name} : 1;\n"
       end
 
       f << "} #{basename}ext_t;\n\n";
 
       f << "extern #{basename}ext_t #{basename}ext;\n\n"
 
-      if @category_prefix == "WGL_"
+      if @spec.api == "wgl"
         f << "extern void #{basename}_init(HDC hdc, int enableDebug);\n"
       else
         f << "extern void #{basename}_init(int enableDebug);\n"
@@ -147,95 +152,83 @@ TEXT
       f << "#endif /* __#{basename.upcase}_H__ */\n"
     end
 
-    puts "#{basename}.h generated"
+    puts "#{dirname}/#{basename}.h generated"
   end
 
-  def write_header_defines(f)
-    current_enum_label = nil
+  def write_header_types(f)
+    @spec.types.each do |type|
+      next if type.name == "khrplatform"
 
-    @spec.enumext_elements.each do |e|
-      if e.name == :enum
-        f << "#endif\n\n" if current_enum_label
-        current_enum_label = e.data
-
-        if e.data =~ /VERSION_(\d+_\d+)/
-          if $1.sub('_', '.').to_f > $user_core_version
-            current_enum_label = nil
-            next
-          end
-        end
-
-        category_name = "#{@enum_prefix}#{current_enum_label}"
-
-        f << "#ifndef #{category_name}\n"
-      elsif current_enum_label
-        case e.name
-        when :define
-          f << "#define #{@enum_prefix}%-48s %s\n" % [e.data.name, e.data.value]
-        when :use
-          f << "/* reuse #{@enum_prefix}#{e.data} */\n"
-        when :passthru, :passend
-          f << "\n" + e.data
-        end
+      if !type.content.empty?
+        f << "#{type.content}\n"
       end
     end
 
-    f << "#endif\n\n" if current_enum_label
+    f << "\n"
   end
 
-  def write_header_function_prototypes(f)
-    current_category = nil
+  def write_header_features(f)
+    @spec.features.each do |feature|
+      next if @spec.api == "wgl" && feature.version <= 1.0
+      next if @spec.api == "glx" && feature.version <= 1.2
 
-    @spec.glspec_elements.each do |e|
-      case e.name
-      when :passthru, :passend
-        if e.data =~ /^typedef unsigned int GLhandleARB;/
-          f << "#ifdef __APPLE__\n"
-          f << "typedef void *GLhandleARB;\n"
-          f << "#else\n"
-          f << "typedef unsigned int GLhandleARB;\n"
-          f << "#endif\n"
-        else
-          f << e.data
-        end
-      when :newcategory
-        current_category = e.data
+      f << "#ifndef #{feature.name}\n"
+      f << "#define #{feature.name}\n"
 
-        category_name = "#{@category_prefix}#{current_category}"
-
-        f << "\n/* #{category_name} */\n"
-      when :command
-        command = e.data
-
-        next if $user_excluded_extensions.include?(command.category)
-        next if !command.valid?($user_core_version)
-
-        if command.category != current_category
-          category_name = "#{@category_prefix}#{command.category}"
-
-          f << "\n/* #{category_name} */\n"
-
-          current_category = command.category
-        end
-
-        if command.deprecated && command.deprecated.to_f <= $user_core_version
-          f << "/* #{$genggl_prefix}#{@command_prefix}#{command.name} DEPRECATED by #{command.deprecated} */\n"
-        else
-          f << "extern #{command.return_type} (APIENTRY *#{$genggl_prefix}#{@command_prefix}#{command.name})(#{command.params.join(", ")});\n"
-        end
+      feature.enums.each do |enum|
+        next if !enum.required
+        f << "#define #{enum.name} #{enum.value}\n"
       end
+
+      f << "#endif\n"
+
+      feature.commands.each do |command|
+        next if !command.required
+        f << "extern #{command.return_type} (APIENTRYP #{$genggl_prefix}#{command.name})(#{command.params.join(", ")});\n"
+      end
+
+      f << "\n"
     end
   end
 
-  def generate_source_file(basename)
-    File.open("#{basename}.c", "w") do |f|
+  def write_header_extensions(f)
+    @spec.extensions.each do |extension|
+      f << "#ifndef #{extension.name}\n"
+      f << "#define #{extension.name}\n"
+
+      extension.enums.each do |enum|
+        next if !enum.required
+        if enum.reused
+          f << "/* reuse #{enum.name} */\n"
+        else
+          f << "#define #{enum.name} #{enum.value}\n"
+        end
+      end
+
+      f << "#endif\n"
+
+      extension.commands.each do |command|
+        next if !command.required
+        if command.reused
+          f << "/* reuse #{command.return_type} (APIENTRYP #{$genggl_prefix}#{command.name})(#{command.params.join(", ")}) */\n"
+        else
+          f << "extern #{command.return_type} (APIENTRYP #{$genggl_prefix}#{command.name})(#{command.params.join(", ")});\n"
+        end
+      end
+
+      f << "\n"
+    end
+  end
+
+  def generate_source_file(dirname, basename)
+    File.open("#{dirname}/#{basename}.c", "w") do |f|
       write_license_comment(f, "#{basename}.c")
 
       f << "\n#include \"#{basename}.h\"\n"
       f << "#include <string.h>\n\n"
       f << "extern void CheckGLError(const char *msg);\n"
 
-      if $user_core_version < 3.1
+      if has_glBegin
         f << "static int _#{$genggl_prefix}glBeginStarted = 0;\n"
       end
 
@@ -256,67 +249,55 @@ TEXT
       write_source_func_rebind(basename, f)
     end
 
-    puts "#{basename}.c generated"
+    puts "#{dirname}/#{basename}.c generated"
   end
 
   def write_source_gl_functions(f)
-    current_category = nil
+    @spec.commands.each do |command|
+      next if !command.required
+      next if command.reused
 
-    @spec.command_array.each do |command|
-      next if $user_excluded_extensions.include?(command.category)
-      next if !command.valid?($user_core_version)
+      # ggl function pointer
+      f << "typedef #{command.return_type} (APIENTRYP PFN#{command.name.upcase})(#{command.params.join(", ")});\n"
+      f << "PFN#{command.name.upcase} #{$genggl_prefix}#{command.name};\n"
+      f << "static PFN#{command.name.upcase} _#{command.name};\n"
+      call_name = "_" + command.name
 
-      f << "\n/* #{@category_prefix}#{command.category} */\n" if command.category != current_category
-      current_category = command.category
+      # debug ggl function
+      f << "static #{command.return_type} APIENTRY d_#{command.name}(#{command.params.join(", ")}) {\n"
 
-      func_name = @command_prefix + command.name
-
-      if command.deprecated && command.deprecated.to_f <= $user_core_version
-        f << "/* #{$genggl_prefix}#{func_name} DEPRECATED by #{command.deprecated} */\n"
+      if command.return_type.casecmp("void") == 0
+        f << "\t#{call_name}("
       else
-        # ggl function pointer
-        f << "typedef #{command.return_type} (APIENTRY *PFN#{func_name.upcase})(#{command.params.join(", ")});\n"
-        f << "PFN#{func_name.upcase} #{$genggl_prefix}#{func_name};\n"
-        f << "static PFN#{func_name.upcase} _#{func_name};\n"
-        call_name = "_" + func_name
-
-        # debug ggl function
-        f << "static #{command.return_type} APIENTRY d_#{func_name}(#{command.params.join(", ")}) {\n"
-
-        if command.return_type.casecmp("void") == 0
-          f << "\t#{call_name}("
-        else
-          f << "\t#{command.return_type} ret = #{call_name}("
-        end
-
-        command.params.each_index do |i|
-          f << ", " if i > 0
-          f << command.params[i].name
-        end
-
-        f << ");\n"
-
-        # glBegin/glEnd deprecated in version 3.1
-        if $user_core_version < 3.1
-          if func_name == "glBegin"
-            f << "\t_#{$genggl_prefix}glBeginStarted++;\n"
-          elsif func_name == "glEnd"
-            f << "\t_#{$genggl_prefix}glBeginStarted--;\n"
-          end
-
-          f << "\tif (!_#{$genggl_prefix}glBeginStarted) { CheckGLError(\"#{func_name}\"); }\n"
-        else
-          f << "\tCheckGLError(\"#{func_name}\");\n"
-        end
-
-        f << "\treturn ret;\n" if command.return_type.casecmp("void") != 0
-        f << "}\n"
+        f << "\t#{command.return_type} ret = #{call_name}("
       end
+
+      command.params.each_index do |i|
+        f << ", " if i > 0
+        f << command.params[i].name
+      end
+
+      f << ");\n"
+
+      if @has_glBegin
+        if command.name == "glBegin"
+          f << "\t_#{$genggl_prefix}glBeginStarted++;\n"
+        elsif command.name == "glEnd"
+          f << "\t_#{$genggl_prefix}glBeginStarted--;\n"
+        end
+
+        f << "\tif (!_#{$genggl_prefix}glBeginStarted) { CheckGLError(\"#{command.name}\"); }\n"
+      else
+        f << "\tCheckGLError(\"#{command.name}\");\n"
+      end
+
+      f << "\treturn ret;\n" if command.return_type.casecmp("void") != 0
+      f << "}\n"
     end
   end
 
   def write_source_func_init(basename, f)
-    if @category_prefix == "WGL_" || $user_core_version < 3.1
+    if @spec.api == "wgl" || !@has_GL_NUM_EXTENSIONS
       f << "static const char *#{basename}ext_str = NULL;\n"
     else
       f << "static GLint #{basename}ext_count = 0;\n"
@@ -324,7 +305,7 @@ TEXT
 
     f << "\nstatic int #{basename}_check_extension(const char *ext) {\n"
 
-    if @category_prefix == "WGL_" || $user_core_version < 3.1
+    if @spec.api == "wgl" || !@has_GL_NUM_EXTENSIONS
       f << "\treturn strstr(#{basename}ext_str, ext) ? 1 : 0;\n"
     else
       f << "\tfor (GLint i = 0; i < #{basename}ext_count; i++) {\n"
@@ -337,54 +318,46 @@ TEXT
 
     f << "}\n"
 
-    if @category_prefix == "WGL_"
+    if @spec.api == "wgl"
       f << "\nvoid #{basename}_init(HDC hdc, int enableDebug) {\n"
     else
       f << "\nvoid #{basename}_init(int enableDebug) {\n"
     end
 
-    current_category = nil
-    temp_commands = []
+    @spec.features.each do |feature|
+      f << "\t/* #{feature.name} */\n"
 
-    print_temp_commands = lambda do
-      f << "\t/* #{@category_prefix}#{temp_commands[0].category} */\n"
+      feature.commands.each do |command|
+        next if !command.required
 
-      if temp_commands[0].core? && temp_commands[0].core_version == 1.0
-        temp_commands.each do |c|
-          func_name = @command_prefix + c.name
-          f << "\t_#{func_name} = #{@command_prefix}#{c.name};\n"
-        end
-      elsif temp_commands[0].valid?($user_core_version)
-        temp_commands.each do |c|
-          func_name = @command_prefix + c.name
-          f << "\t_#{func_name} = (PFN#{func_name.upcase})GPA(#{func_name});\n"
+        if feature.version <= 1.1
+          f << "\t_#{command.name} = #{command.name};\n"
+        else
+          f << "\t_#{command.name} = (PFN#{command.name.upcase})GPA(#{command.name});\n"
         end
       end
+
+      f << "\n"
     end
 
-    # commands in command_array is already sorted by spec file source
-    @spec.command_array.each do |command|
-      next if $user_excluded_extensions.include?(command.category)
-      next if !command.valid?($user_core_version)
-      next if command.deprecated && command.deprecated.to_f <= $user_core_version
+    @spec.extensions.each do |extension|
+      f << "\t/* #{extension.name} */\n"
 
-      if command.category != current_category
-        print_temp_commands.call if !temp_commands.empty?
-        temp_commands.clear
+      extension.commands.each do |command|
+        next if !command.required
+
+        f << "\t_#{command.name} = (PFN#{command.name.upcase})GPA(#{command.name});\n"
       end
 
-      temp_commands << command
-      current_category = command.category
+      f << "\n"
     end
-
-    print_temp_commands.call if !temp_commands.empty?
 
     f << "\t#{basename}_rebind(enableDebug);\n"
     f << "\n"
 
-    if @category_prefix == "WGL_"
+    if @spec.api == "wgl"
       f << "\t#{basename}ext_str = (const char *)_wglGetExtensionsStringARB(hdc);\n"
-    elsif $user_core_version < 3.1
+    elsif !@has_GL_NUM_EXTENSIONS
       f << "\t#{basename}ext_str = (const char *)_glGetString(GL_EXTENSIONS);\n"
     else
       f << "\t_glGetIntegerv(GL_NUM_EXTENSIONS, &#{basename}ext_count);\n"
@@ -392,9 +365,8 @@ TEXT
 
     f << "\tmemset(&#{basename}ext, 0, sizeof(#{basename}ext));\n"
 
-    @spec.categories.sort.each do |category_name|
-      next if category_name !~ /^(#{@spec.extension_group_names.join('|')})_/
-      f << "\tif (#{basename}_check_extension(\"#{@category_prefix}#{category_name}\")) #{basename}ext._#{@category_prefix}#{category_name} = 1;\n"
+    @spec.extensions.each do |extension|
+      f << "\tif (#{basename}_check_extension(\"#{extension.name}\")) #{basename}ext._#{extension.name} = 1;\n"
     end
 
     f << "}\n\n"
@@ -404,25 +376,18 @@ TEXT
     f << "void #{basename}_rebind(int enableDebug) {\n"
     f << "\tif (!enableDebug) {\n"
 
-    @spec.command_array.each do |command|
-      next if $user_excluded_extensions.include?(command.category)
-      next if !command.valid?($user_core_version)
-      next if command.deprecated && command.deprecated.to_f <= $user_core_version
+    @spec.commands.each do |command|
+      next if !command.required
 
-      func_name = @command_prefix + command.name
-      f << "\t\t#{$genggl_prefix}#{func_name} = _#{func_name};\n"
+      f << "\t\t#{$genggl_prefix}#{command.name} = _#{command.name};\n"
     end
 
-    f << "\t}\n"
-    f << "\telse {\n"
+    f << "\t} else {\n"
 
-    @spec.command_array.each do |command|
-      next if $user_excluded_extensions.include?(command.category)
-      next if !command.valid?($user_core_version)
-      next if command.deprecated && command.deprecated.to_f <= $user_core_version
+    @spec.commands.each do |command|
+      next if !command.required
 
-      func_name = @command_prefix + command.name
-      f << "\t\t#{$genggl_prefix}#{func_name} = d_#{func_name};\n"
+      f << "\t\t#{$genggl_prefix}#{command.name} = d_#{command.name};\n"
     end
 
     f << "\t}\n"
@@ -442,90 +407,80 @@ end
 
 #-------------------------------------------------------------------------------
 
-valid_core_version_numbers = [1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 2.1, 3.0, 3.1, 3.2, 3.3, 4.0, 4.1, 4.2, 4.3]
+valid_profile_strings = ["core", "compatibility", "es"]
 
 if ARGV[0] == "--help"
-  puts "Usage: genggl <core-version>"
-  puts "core-version: one of the #{valid_core_version_numbers.join(", ")} (if not specified default is 1.1)"
+  puts "Usage: genggl <api> <version>"
+  puts "profile: one of the #{valid_profile_strings.join(", ")}"
+  puts "version: version number"
   exit
 end
 
-$user_core_version = (ARGV[0] || "1.1").to_f
-if !(valid_core_version_numbers.include?($user_core_version))
-  puts "invalid core version #{$user_core_version}"
+$all_version = 100
+$user_version = ARGV[1].to_f
+
+case ARGV[0]
+when "core"
+  $user_profile = "core"
+  $user_api = "gl"
+  $user_dir = "glcore"
+when "compatibility"
+  $user_profile = "compatibility"
+  $user_api = "gl"
+  $user_dir = "gl"
+when "es"
+  $user_profile = "common"
+  if $user_version < 2.0
+    $user_api = "gles1"
+    $user_dir = "es"
+  elsif $user_version < 3.0
+    $user_api = "gles2"
+    $user_dir = "es2"
+  else
+    $user_api = "gles2"
+    $user_dir = "es3"
+  end
+else
+  puts "Invalid profile #{ARGV[0]}"
   exit
 end
 
-$user_excluded_extensions = []
-if File.exist?("excluded_extensions.txt")
-  $user_excluded_extensions = IO.readlines("excluded_extensions.txt").map { |x| x.strip }.uniq
-end
-
-puts "GenGGL Version: #{$genggl_version_string}"
-puts "trying to generate GGL based on core version #{$user_core_version}"
+puts "Trying to generate GGL based on #{$user_api} #{$user_profile} #{$user_version}"
 
 #-------------------------------------------------------------------------------
 
 #registry_url = "http://www.opengl.org/registry/api"
-registry_url = "https://cvs.khronos.org/svn/repos/ogl/trunk/doc/registry/public/oldspecs"
+#registry_url = "https://cvs.khronos.org/svn/repos/ogl/trunk/doc/registry/public/oldspecs"
+registry_url = "https://cvs.khronos.org/svn/repos/ogl/trunk/doc/registry/public/api"
 
 spec = GLSpec.new(
-  :typemap => "#{registry_url}/gl.tm",
-  :enumext => "#{registry_url}/enumext.spec",
-  :glspec  => "#{registry_url}/gl.spec"
+  :api => $user_api,
+  :profile => $user_profile,
+  :version => $user_version,
+  :url => "#{registry_url}/gl.xml"
 )
 
-gen = GGLGenerator.new(spec, "GL_", "gl", "GL_")
+gen = GGLGenerator.new(spec)
+gen.generate_header_and_source_file($user_dir, "#{$genggl_prefix}gl")
 
-# we'll ignore this function
-gen.spec.del_command("StencilMaskSeparate")
+if $user_api == "gl"
+  spec = GLSpec.new(
+    :api => "glx",
+    :profile => "common",
+    :version => $all_version,
+    :url => "#{registry_url}/glx.xml"
+  )
 
-=begin
-[ "FramebufferTextureARB",
-  "VertexAttribDivisorARB",
-  "GetBufferParameterivARB",
-  "GetConvolutionFilterEXT",
-  "GetConvolutionParameterfvEXT",
-  "GetConvolutionParameterivEXT",
-  "GetSeparableFilterEXT",
-  "GetHistogramEXT",
-  "GetHistogramParameterfvEXT",
-  "GetHistogramParameterivEXT",
-  "GetMinmaxParameterivEXT",
-  "GetMinmaxEXT",
-  "GetMinmaxParameterfvEXT",
-  "GetMinmaxParameterfiEXT",
-  "AreTexturesResidentEXT",
-  "BindTextureEXT",
-  "DeleteTexturesEXT",
-  "GenTexturesEXT",
-  "IsTextureEXT",
-  "GetColorTableSGI",
-  "GetColorTableParameterfvSGI",
-  "GetColorTableParameterivSGI"].each do |x|
-  if command = spec.find_command(x)
-    command.alias = x.sub(/(#{gen.spec.extension_group_names.join('|')})$/, '')
-    gen.spec.find_command(command.alias).original = command
-  end
+  gen = GGLGenerator.new(spec)
+  gen.generate_header_and_source_file($user_dir, "#{$genggl_prefix}glx")
+
+  spec = GLSpec.new(
+    :api => "wgl",
+    :profile => "common",
+    :version => $all_version,
+    :url => "#{registry_url}/wgl.xml"
+  )
+
+  gen = GGLGenerator.new(spec)
+  gen.generate_header_and_source_file($user_dir, "#{$genggl_prefix}wgl")
 end
-=end
-
-gen.generate_header_and_source_file("#{$genggl_prefix}gl")
-
-spec = GLSpec.new(
-  :typemap => "#{registry_url}/glx.tm",
-  :enumext => "#{registry_url}/glxenumext.spec",
-  :glspec  => "#{registry_url}/glxext.spec"
-)
-
-gen = GGLGenerator.new(spec, "GLX_", "glX", "GLX_")
-gen.generate_header_and_source_file("#{$genggl_prefix}glx")
-
-spec = GLSpec.new(
-  :typemap => "#{registry_url}/wgl.tm",
-  :enumext => "#{registry_url}/wglenumext.spec",
-  :glspec  => "#{registry_url}/wglext.spec"
-)
-
-gen = GGLGenerator.new(spec, "", "wgl", "WGL_")
-gen.generate_header_and_source_file("#{$genggl_prefix}wgl")

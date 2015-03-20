@@ -1,8 +1,8 @@
 #----------------------------------------------------------------------------------------------
 #
-# glspec.rb
+# glxml.rb
 # GenGGL (OpenGL extension glue code generator in C)
-# Version: 0.2.2
+# Version: 0.3.0
 #
 # Copyright 2010 Ju Hyung Lee. All rights reserved.
 #
@@ -32,227 +32,298 @@
 #
 #----------------------------------------------------------------------------------------------
 
-require 'net/http'
+require 'open-uri'
+require 'nokogiri'
 
-class GLCommandParam
-  attr_reader :name, :typename, :pointer, :const
-  attr_writer :name, :typename, :pointer, :const
+class GLBase
+  attr_reader :required, :reused
+  attr_writer :required, :reused
 
-  def to_s
-    (const ? "const " : "") + typename + (pointer ? "* " : " ") + name
+  def initialize
+    @required = false
+    @reused = false
   end
 end
 
-class GLCommand
-  attr_reader :name, :category, :vectorequiv, :alias, :original, :return_type, :params, :deprecated
-  attr_writer :name, :category, :vectorequiv, :alias, :original, :return_type, :params, :deprecated
+class GLType < GLBase
+  attr_reader :name, :api, :content
+  attr_writer :content
 
-  def initialize(name, spec)
+  def initialize(name, api)
+    super()
     @name = name
-    @params = Array.new
-    @spec = spec
-  end
-
-  def core?
-    @category =~ /^VERSION_/ ? true : false
-  end
-
-  def core_version
-    @category =~ /^VERSION_(\d+_\d+)/ ? $1.sub('_', '.').to_f : nil
-  end
-
-  def core_extension? # 코어화된 extension (non post-fix)
-    @category !~ /^VERSION_/ && @name !~ /(#{@spec.extension_group_names.join('|')})$/ ? true : false
-  end
-
-  def extension? # 일반적인 extension
-    @category !~ /^VERSION_/ && @name =~ /(#{@spec.extension_group_names.join('|')})$/ ? true : false
-  end
-
-  def valid?(version)
-    return true if core? && core_version <= version
-    return true if core_extension?
-    return true if extension? && (!(a_command = aliased) || !a_command.core? || (a_command.core? && a_command.core_version > version))
-    return false
-  end
-
-  def aliased
-    alias_name = self.alias
-    command = nil
-
-    # alias might be recursive
-    while alias_name do
-      command = @spec.command_array.find { |x| x.name == alias_name }
-      puts "WARNING: alias \"#{alias_name}\" not found" if !command
-      alias_name = command.alias
-    end
-
-    return command
+    @api = api
   end
 end
 
-class GLDefine
-  attr_reader :name, :value
+class GLGroup < GLBase
+  attr_reader :name, :enums
 
-  def initialize(name, value)
+  def initialize(name)
+    super()
+    @name = name
+    @nums = []
+  end
+end
+
+class GLEnum < GLBase
+  attr_reader :name, :value, :alias_name
+
+  def initialize(name, value, alias_name)
+    super()
     @name = name
     @value = value
+    @alias_name = alias_name
+    @reused = false
   end
 end
 
-class GLSpecElement
-  attr_reader :name, :data
+class GLCommandParam
+  attr_reader :name, :content, :group_name
 
-  def initialize(name, data)
+  def initialize(name, content, group_name)
     @name = name
-    @data = data
+    @content = content
+    @group_name = group_name
+  end
+
+  def to_s
+    @content
+  end
+end
+
+class GLCommand < GLBase
+  attr_reader :name, :return_type, :alias_name, :params
+  attr_writer :alias_name, :params
+
+  def initialize(name, return_type)
+    super()
+    @return_type = return_type
+    @name = name
+    @params = []
+  end
+end
+
+class GLFeature
+  attr_reader :name, :api, :version, :enums, :types, :commands
+  attr_writer :enums, :types, :commands
+
+  def initialize(name, api, version)
+    @name = name
+    @api = api
+    @version = version
+    @enums = []
+    @types = []
+    @commands = []
+  end
+end
+
+class GLExtension
+  attr_reader :name, :enums, :types, :commands
+  attr_writer :enums, :types, :commands
+
+  def initialize(name)
+    @name = name
+    @enums = []
+    @types = []
+    @commands = []
   end
 end
 
 class GLSpec
-  attr_reader :versions, :enumext_elements, :glspec_elements, :type_hash, :categories, :extension_group_names, :command_array
+  attr_reader :api, :profile, :version, :types, :groups, :enums, :commands, :features, :extensions
 
-  def initialize(url)
-    @enumext_elements = []
-    @glspec_elements = []
-    @type_hash = {}
-    @command_array = []
-    @command_hash = {}
-    @categories = []
+  def initialize(config)
+    @api = config[:api]
+    @profile = config[:profile]
+    @version = config[:version]
+    @types = []
+    @groups = []
+    @enums = []
+    @commands = []
+    @features = []
+    @extensions = []
 
-    puts "parsing #{url[:typemap]}..."
-    parse_typemap_url(url[:typemap])
-
-    puts "parsing #{url[:enumext]}..."
-    parse_enumext_url(url[:enumext])
-
-    puts "parsing #{url[:glspec]}..."
-    parse_glspec_url(url[:glspec])
+    parse_xml(config[:url])
   end
 
-  def new_command(command_name)
-    if !@command_hash[command_name]
-      @command_array << command = GLCommand.new(command_name, self)
-      @command_hash[command_name] = command
+  def match_api_profile(api, profile)
+    if (api)
+      return @api == api
+    end
+
+    if (@profile != 'common')
+      if (profile)
+        return @profile == profile
+      end
+    end
+
+    return true
+  end
+
+  def parse_xml(url)
+    puts "parsing #{url}..."
+    doc = Nokogiri::XML(open(url))
+
+    parse_types(doc)
+    parse_groups(doc)
+    parse_enums(doc)
+    parse_commands(doc)
+    parse_features(doc)
+    parse_extensions(doc)
+  end
+
+  def parse_types(doc)
+    doc.xpath("registry/types/type").each do |type_tag|
+      type_name = type_tag['name']
+      type_api = type_tag['api']
+
+      next if !match_api_profile(type_api, nil)
+
+      @types << type = GLType.new(type_name, type_api)
+
+      apientry_displaced = type_tag.to_s.sub(/<apientry\/>/, 'APIENTRY')
+      newdoc = Nokogiri::XML(apientry_displaced)
+      type.content = newdoc.at('type').content
     end
   end
 
-  def del_command(command_name)
-    if command = @command_hash[command_name]
-      @command_array.delete(command)
-      @command_hash[command_name] = nil
-    end
-  end
+  def parse_groups(doc)
+    doc.xpath("registry/groups/group").each do |group_tag|
+      @groups << group = GLGroup.new(group_tag['name'])
 
-  def find_command(command_name)
-    @command_hash[command_name]
-  end
-
-  def typemap(typename)
-    return "void" if typename == "void"
-    @type_hash[typename]
-  end
-
-  def parse_typemap_url(url)
-    parse_url_each_line(url) do |line|
-      ar = line.split(',')
-      @type_hash[ar[0]] = ar[3].to_s.strip
-    end
-  end
-
-  def parse_enumext_url(url)
-    parse_url_each_line(url) do |line|
-      if line =~ /(^pass(thru|end)):/
-        @enumext_elements << GLSpecElement.new($1.to_sym, line.sub(/^\w+: ?/, ''))
-      elsif line =~ /(^\w+)\senum:/
-        @enumext_elements << GLSpecElement.new(:enum, $1)
-      elsif line =~ /^\s+(\w+)\s+\=\s+(\-?\w+)/
-        @enumext_elements << GLSpecElement.new(:define, GLDefine.new($1, $2))
-      elsif line =~ /^\s+use\s+\w+\s+(\w+)/
-        @enumext_elements << GLSpecElement.new(:use, $1)
+      group_tag.xpath("/enum").each do |enum_tag|
+        group.enum_names << enum_tag['name']
       end
     end
   end
 
-  def parse_glspec_url(url)
-    command = nil
-    parse_url_each_line(url) do |line|
-      if line =~ /^category:\s+/
-        @categories.concat(line.sub(/^category:\s+/, '').split)
-      elsif line =~ /(^pass(thru|end)):/
-        @glspec_elements << GLSpecElement.new($1.to_sym, line.sub(/^\w+: ?/, ''))
-      elsif line =~ /^newcategory:\s+(\w+)/
-        @categories << $1
-        @glspec_elements << GLSpecElement.new(:newcategory, $1)
-      elsif line =~ /^version:\s+/
-        @versions = line.sub(/^version:\s+/, '').split
-      elsif line =~ /(^\w+?)\(.*\)/ # command
-        @command_array << command = GLCommand.new($1, self)
-        @command_hash[$1] = command
-        @glspec_elements << GLSpecElement.new(:command, command)
-      elsif line =~ /\s+(\w+)\s+(.*)/ # command property
-        case $1
-        when 'return'
-          command.return_type = typemap($2)
-        when 'param'
-          x = $2
-          puts "WARNING: unmatched \"#{x}\"" if (x =~ /(\w+)\s+(\w+)\s+/) == nil
-          param_name = $1
-          # prevent using C keywords
-          param_name = "z#{param_name}" if param_name == "near" || param_name == "far"
-          param_type = $2
-          x.sub!($&, '')
-          #param_type.sub!(/\w+\b/, "PixelInternalFormat") if command.name =~ /^TexImage(1|2|3)D/ && param_name == "internalformat"
-          puts "WARNING: unmatched \"#{x}\"" if (x =~ /(in|out)\s+(value|reference|array)/) == nil
+  def parse_enums(doc)
+    doc.xpath("registry/enums/enum").each do |enum_tag|
+      enum_name = enum_tag['name']
+      enum_value = enum_tag['value']
+      enum_alias = enum_tag['alias']
+      @enums << enum = GLEnum.new(enum_name, enum_value, enum_alias)
+    end
+  end
 
-          param = GLCommandParam.new
-          param.name = param_name
-          param.typename = typemap(param_type)
-          if $2 == "reference" || $2 == "array"
-            param.pointer = true
-            param.const = true if $1 == "in"
+  def parse_commands(doc)
+    doc.xpath("registry/commands/command").each do |command_tag|
+      proto_tag = command_tag.at('proto')
+      name_stripped = proto_tag.to_s.sub(/<name[^>]*>.*?<\/name>/, '')
+      newdoc = Nokogiri::XML(name_stripped)
+
+      command_return_type = newdoc.content.strip
+      command_name = proto_tag.at('name').content
+
+      @commands << command = GLCommand.new(command_name, command_return_type)
+
+      command_tag.xpath("param").each do |param_tag|
+        command_group_name = param_tag['group']
+        command_name = param_tag.at('name').content
+
+        param = GLCommandParam.new(command_name, param_tag.content, command_group_name)
+        command.params << param
+      end
+
+      alias_tag = command_tag.at('alias')
+      if (alias_tag)
+        command.alias_name = alias_tag['name']
+      end
+    end
+  end
+
+  def parse_features(doc)
+    doc.xpath("registry/feature").each do |feature_tag|
+      feature_api = feature_tag['api']
+      feature_name = feature_tag['name']
+      feature_version = feature_tag['number'].to_f
+
+      next if !match_api_profile(feature_api, nil)
+      next if feature_version > @version
+
+      @features << feature = GLFeature.new(feature_name, feature_api, feature_version)
+
+      feature_tag.xpath("require").each do |require_tag|
+        require_profile = require_tag['profile']
+        require_comment = require_tag['comment']
+
+        next if !match_api_profile(nil, require_profile)
+
+        require_tag.xpath("enum").each do |enum_tag|
+          enum_name = enum_tag['name']
+          enum = @enums.find { |x| x.name == enum_name }
+          enum.required = true
+          feature.enums << enum if !feature.enums.find { |x| x.name == enum_name }
+        end
+
+        require_tag.xpath("command").each do |command_tag|
+          command_name = command_tag['name']
+          command = @commands.find { |x| x.name == command_name }
+          command.required = true
+          feature.commands << command if !feature.commands.find { |x| x.name == command_name }
+        end
+      end
+
+      feature_tag.xpath("remove").each do |remove_tag|
+        remove_profile = remove_tag['profile']
+        remove_comment = remove_tag['comment']
+
+        next if !match_api_profile(nil, remove_profile)
+
+        remove_tag.xpath("enum").each do |enum_tag|
+          enum_name = enum_tag['name']
+          enum = @enums.find { |x| x.name == enum_name }
+          enum.required = false
+        end
+
+        remove_tag.xpath("command").each do |command_tag|
+          command_name = command_tag['name']
+          command = @commands.find { |x| x.name == command_name }
+          command.required = false
+        end
+      end
+    end
+  end
+
+  def parse_extensions(doc)
+    doc.xpath("registry/extensions/extension").each do |extension_tag|
+      extension_name = extension_tag['name']
+      extension_supported = extension_tag['supported']
+
+      supported_array = extension_supported.split('|')
+      next if !supported_array.include?(@api)
+
+      # Skip if extension is not supported by core profile
+      #supported_glcore = supported_array.find { |x| x == 'glcore' }
+      #next if @profile == 'core' && !supported_glcore
+
+      @extensions << extension = GLExtension.new(extension_name)
+
+      extension_tag.xpath("require").each do |require_tag|
+        require_comment = require_tag['comment']
+
+        require_tag.xpath("enum").each do |enum_tag|
+          enum_name = enum_tag['name']
+          enum = @enums.find { |x| x.name == enum_name }
+          if enum.required
+            enum = enum.clone
+            enum.reused = true
           end
-          command.params << param
-        when 'category'
-          command.category = $2
-        when 'deprecated'
-          command.deprecated = $2
-        when 'vectorequiv'
-          command.vectorequiv = $2
-        when 'alias'
-          command.alias = $2
-          command.alias << 's' if command.alias == 'GenVertexArray' # 's' is omitted in spec file
+          enum.required = true
+          extension.enums << enum
         end
-      end
-    end
 
-    # EXT_texture_compression_s3tc is omitted in spec file
-    @categories << "EXT_texture_compression_s3tc"
-
-    @categories.uniq!.sort!
-    @extension_group_names = @categories.grep(/(^[A-Z0-9]+?)_/) { |x| $1 }.reject { |x| x =~ /^VERSION/ }.uniq
-
-    @command_array.each do |command|
-      if command.alias
-        @command_hash[command.alias].original = command
-      elsif !command.core? && command.vectorequiv
-        ve_command = @command_hash[command.vectorequiv]
-        if ve_command.core?
-          command.alias = command.vectorequiv.chop
-          @command_hash[command.alias].original = command
+        require_tag.xpath("command").each do |command_tag|
+          command_name = command_tag['name']
+          command = @commands.find { |x| x.name == command_name }
+          if command.required
+            command = command.clone
+            command.reused = true
+          end
+          command.required = true
+          extension.commands << command
         end
-      end
-    end
-  end
-
-  def parse_url_each_line(url)
-    Net::HTTP.get_response(URI.parse(url)) do |resp|
-      resp.body.each_line do |line|
-        if line !~ /^pass(thru|end):/
-          line.sub!(/#.*/, '')
-          line.rstrip!
-        end
-        yield line
       end
     end
   end
