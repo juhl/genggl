@@ -2,7 +2,7 @@
 #
 # genggl.rb
 # GenGGL (OpenGL extension glue code generator in C)
-# Version: 0.3.0
+# Version: 0.3.1
 #
 # Copyright 2010 Ju Hyung Lee. All rights reserved.
 #
@@ -32,8 +32,50 @@
 #
 #----------------------------------------------------------------------------------------------
 
-$genggl_version_string = "0.3.0"
+$genggl_version_string = "0.3.1"
 $genggl_prefix = "g"
+
+$gl_platform_text = <<TEXT
+#ifdef _WIN32
+#include <windows.h>
+#include <gl/gl.h>
+#endif
+
+#if defined(__APPLE__)
+#define GL_GLEXT_LEGACY
+#include <OpenGL/gl.h>
+#endif
+
+#if defined(__linux__)
+#include <gl/gl.h>
+#endif
+TEXT
+
+$wgl_platform_text = <<TEXT
+#include <windows.h>
+#include <gl/gl.h>
+TEXT
+
+$gles1_platform_text = <<TEXT
+#if defined(__APPLE__)
+#include <OpenGLES/ES1/gl.h>
+#include <OpenGLES/ES1/glext.h>
+#endif
+TEXT
+
+$gles2_platform_text = <<TEXT
+#if defined(__APPLE__)
+#include <OpenGLES/ES2/gl.h>
+#include <OpenGLES/ES2/glext.h>
+#endif
+TEXT
+
+$gles3_platform_text = <<TEXT
+#if defined(__APPLE__)
+#include <OpenGLES/ES3/gl.h>
+#include <OpenGLES/ES3/glext.h>
+#endif
+TEXT
 
 #require 'profile'
 require 'rbconfig'
@@ -108,23 +150,29 @@ TEXT
       f << "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n"
 
       if @spec.api == "gl"
-        f << "#ifdef _WIN32\n\n"
-        f << "#include <windows.h>\n"
-        f << "#include <gl/gl.h>\n\n"
-        f << "#elif defined(__APPLE__)\n\n"
-        f << "#define GL_GLEXT_LEGACY\n"
-        f << "#include <OpenGL/gl.h>\n\n"
-        f << "#elif defined(__linux__)\n"
-        f << "#include <gl/gl.h>\n\n"
-        f << "#endif\n\n"
+        f << $gl_platform_text
       elsif @spec.api == "wgl"
-        f << "#include <windows.h>\n"
-        f << "#include <gl/gl.h>\n\n"
+        f << $wgl_platform_text
+      elsif @spec.api =~ /^gles/
+        if $user_version < 2.0
+          f << $gles1_platform_text
+        elsif $user_version < 3.0
+          f << $gles2_platform_text
+        else
+          f << $gles3_platform_text
+        end
       end
 
-      f << "#ifndef APIENTRY\n#define APIENTRY\n#endif\n"
-      f << "#ifndef APIENTRYP\n#define APIENTRYP APIENTRY *\n#endif\n"
-      f << "#ifndef GLAPI\n#define GLAPI extern\n#endif\n\n"
+      f << "\n"
+      f << "#ifndef APIENTRY\n"
+      f << "#define APIENTRY\n"
+      f << "#endif\n"
+      f << "#ifndef APIENTRYP\n"
+      f << "#define APIENTRYP APIENTRY *\n"
+      f << "#endif\n"
+      f << "#ifndef GLAPI\n"
+      f << "#define GLAPI extern\n"
+      f << "#endif\n\n"
 
       write_header_types(f)
       write_header_features(f)
@@ -157,11 +205,9 @@ TEXT
 
   def write_header_types(f)
     @spec.types.each do |type|
-      next if type.name == "khrplatform"
+      next if type.content.empty?
 
-      if !type.content.empty?
-        f << "#{type.content}\n"
-      end
+      f << "#{type.content}\n"      
     end
 
     f << "\n"
@@ -194,7 +240,6 @@ TEXT
   def write_header_extensions(f)
     @spec.extensions.each do |extension|
       f << "#ifndef #{extension.name}\n"
-      f << "#define #{extension.name}\n"
 
       extension.enums.each do |enum|
         next if !enum.required
@@ -226,7 +271,7 @@ TEXT
 
       f << "\n#include \"#{basename}.h\"\n"
       f << "#include <string.h>\n\n"
-      f << "extern void CheckGLError(const char *msg);\n"
+      f << "extern void CheckGLError(const char *msg);\n\n"
 
       if has_glBegin
         f << "static int _#{$genggl_prefix}glBeginStarted = 0;\n"
@@ -234,14 +279,16 @@ TEXT
 
       write_source_gl_functions(f)
 
-      f << "\n#ifdef _WIN32\n"
-      f << "#define GPA(a) wglGetProcAddress(\#a)\n"
-      f << "#elif defined(__APPLE__)\n"
-      f << "#define GPA(a) mglGetProcAddress(\#a)\n"
-      f << "extern void *mglGetProcAddress(const char *name);\n"
-      f << "#elif defined(__linux__)\n"
-      f << "#define GPA(a) glXGetProcAddressARB((const GLubyte *)\#a)\n"
-      f << "#endif\n\n"
+      if @spec.api =~ /^(gl|wgl|glx)$/
+        f << "\n#ifdef _WIN32\n"
+        f << "#define GPA(a) wglGetProcAddress(\#a)\n"
+        f << "#elif defined(__APPLE__)\n"
+        f << "#define GPA(a) mglGetProcAddress(\#a)\n"
+        f << "extern void *mglGetProcAddress(const char *name);\n"
+        f << "#elif defined(__linux__)\n"
+        f << "#define GPA(a) glXGetProcAddressARB((const GLubyte *)\#a)\n"
+        f << "#endif\n\n"
+      end
 
       f << "#{basename}ext_t #{basename}ext;\n"
 
@@ -325,31 +372,51 @@ TEXT
     end
 
     @spec.features.each do |feature|
-      f << "\t/* #{feature.name} */\n"
+      if feature.commands.count > 0
+        f << "\t/* #{feature.name} */\n" 
+      end
 
       feature.commands.each do |command|
         next if !command.required
 
-        if feature.version <= 1.1
+        if (@spec.api == 'gl' && feature.version <= 1.1) || @spec.api =~ /^gles/
           f << "\t_#{command.name} = #{command.name};\n"
         else
           f << "\t_#{command.name} = (PFN#{command.name.upcase})GPA(#{command.name});\n"
         end
       end
 
-      f << "\n"
+      if feature.commands.count > 0
+        f << "\n"
+      end
     end
 
     @spec.extensions.each do |extension|
-      f << "\t/* #{extension.name} */\n"
+      if extension.commands.count > 0
+        if @spec.api =~ /^gles/
+          f << "#ifdef #{extension.name}\n"
+        else
+          f << "\t/* #{extension.name} */\n"
+        end
+      end
 
       extension.commands.each do |command|
         next if !command.required
 
-        f << "\t_#{command.name} = (PFN#{command.name.upcase})GPA(#{command.name});\n"
+        if @spec.api =~ /^gles/
+          f << "\t_#{command.name} = #{command.name};\n"
+        else
+          f << "\t_#{command.name} = (PFN#{command.name.upcase})GPA(#{command.name});\n"
+        end
       end
 
-      f << "\n"
+      if extension.commands.count > 0
+        if @spec.api =~ /^gles/
+          f << "#endif\n\n"
+        else
+          f << "\n"
+        end
+      end
     end
 
     f << "\t#{basename}_rebind(enableDebug);\n"
@@ -416,29 +483,29 @@ if ARGV[0] == "--help"
   exit
 end
 
-$all_version = 100
+all_version = 100
 $user_version = ARGV[1].to_f
 
 case ARGV[0]
 when "core"
   $user_profile = "core"
   $user_api = "gl"
-  $user_dir = "glcore"
+  $user_dir = "GL"
 when "compatibility"
   $user_profile = "compatibility"
   $user_api = "gl"
-  $user_dir = "gl"
+  $user_dir = "GL"
 when "es"
   $user_profile = "common"
   if $user_version < 2.0
     $user_api = "gles1"
-    $user_dir = "es"
+    $user_dir = "GLES"
   elsif $user_version < 3.0
     $user_api = "gles2"
-    $user_dir = "es2"
+    $user_dir = "GLES2"
   else
     $user_api = "gles2"
-    $user_dir = "es3"
+    $user_dir = "GLES3"
   end
 else
   puts "Invalid profile #{ARGV[0]}"
@@ -467,7 +534,7 @@ if $user_api == "gl"
   spec = GLSpec.new(
     :api => "glx",
     :profile => "common",
-    :version => $all_version,
+    :version => all_version,
     :url => "#{registry_url}/glx.xml"
   )
 
@@ -477,7 +544,7 @@ if $user_api == "gl"
   spec = GLSpec.new(
     :api => "wgl",
     :profile => "common",
-    :version => $all_version,
+    :version => all_version,
     :url => "#{registry_url}/wgl.xml"
   )
 

@@ -2,7 +2,7 @@
 #
 # glspec.rb
 # GenGGL (OpenGL extension glue code generator in C)
-# Version: 0.3.0
+# Version: 0.3.1
 #
 # Copyright 2010 Ju Hyung Lee. All rights reserved.
 #
@@ -177,7 +177,10 @@ class GLSpec
     doc.xpath("registry/types/type").each do |type_tag|
       type_name = type_tag['name']
       type_api = type_tag['api']
+      type_requires = type_tag['requires']
 
+      next if type_name == "khrplatform"
+      next if type_requires && !@types.find { |x| x.name == type_requires }
       next if !match_api_profile(type_api, nil)
 
       @types << type = GLType.new(type_name, type_api)
