@@ -2,7 +2,7 @@
 #
 # genggl.rb
 # GenGGL (OpenGL extension glue code generator in C)
-# Version: 0.3.1
+# Version: 0.3.2
 #
 # Copyright 2010 Ju Hyung Lee. All rights reserved.
 #
@@ -32,7 +32,7 @@
 #
 #----------------------------------------------------------------------------------------------
 
-$genggl_version_string = "0.3.1"
+$genggl_version_string = "0.3.2"
 $genggl_prefix = "g"
 
 $gl_platform_text = <<TEXT
@@ -74,6 +74,29 @@ $gles3_platform_text = <<TEXT
 #if defined(__APPLE__)
 #include <OpenGLES/ES3/gl.h>
 #include <OpenGLES/ES3/glext.h>
+#endif
+TEXT
+
+$gpa_text = <<TEXT
+#ifdef _WIN32
+#define GPA(a) wglGetProcAddress(#a)
+#elif defined(__APPLE__)
+#define GPA(a) nsglGetProcAddress(#a)
+#include <CoreFoundation/CoreFoundation.h>
+void *nsglGetProcAddress(const char *procname) {
+    static CFBundleRef openGLFramework = nil;
+    if (openGLFramework == nil) {
+        openGLFramework = CFBundleGetBundleWithIdentifier(CFSTR("com.apple.opengl"));
+    }
+
+    CFStringRef symbolName = CFStringCreateWithCString(kCFAllocatorDefault, procname, kCFStringEncodingASCII);
+    void *symbol = CFBundleGetFunctionPointerForName(openGLFramework, symbolName);
+    CFRelease(symbolName);
+    
+    return symbol;
+}
+#elif defined(__linux__)
+#define GPA(a) glXGetProcAddressARB((const GLubyte *)#a)
 #endif
 TEXT
 
@@ -280,14 +303,9 @@ TEXT
       write_source_gl_functions(f)
 
       if @spec.api =~ /^(gl|wgl|glx)$/
-        f << "\n#ifdef _WIN32\n"
-        f << "#define GPA(a) wglGetProcAddress(\#a)\n"
-        f << "#elif defined(__APPLE__)\n"
-        f << "#define GPA(a) nsglGetProcAddress(\#a)\n"
-        f << "extern void *nsglGetProcAddress(const char *name);\n"
-        f << "#elif defined(__linux__)\n"
-        f << "#define GPA(a) glXGetProcAddressARB((const GLubyte *)\#a)\n"
-        f << "#endif\n\n"
+        f << "\n"
+        f << $gpa_text
+        f << "\n"
       end
 
       f << "#{basename}ext_t #{basename}ext;\n"

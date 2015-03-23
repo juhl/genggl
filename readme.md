@@ -56,9 +56,3 @@ Callback functions
 	{
     	...
 	}
-
-	/* you should provide dynamic function getter (just like GetProcAddress in windows) for Mac OS X for now (0.1) */
-	void *mglGetProcAddress(const char *name)
-	{
-    	...
-	}
