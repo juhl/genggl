@@ -263,6 +263,7 @@ TEXT
   def write_header_extensions(f)
     @spec.extensions.each do |extension|
       f << "#ifndef #{extension.name}\n"
+      f << "#define #{extension.name}\n" if @spec.api !~ /^gles/
 
       extension.enums.each do |enum|
         next if !enum.required

@@ -152,10 +152,8 @@ class GLSpec
       return @api == api
     end
 
-    if (@profile != 'common')
-      if (profile)
-        return @profile == profile
-      end
+    if (profile && @profile != 'common')
+      return @profile == profile
     end
 
     return true
@@ -315,7 +313,10 @@ class GLSpec
       @extensions << extension = GLExtension.new(extension_name)
 
       extension_tag.xpath("require").each do |require_tag|
+        require_api = require_tag['api']
         require_comment = require_tag['comment']
+
+        next if !match_api_profile(require_api, nil)
 
         require_tag.xpath("enum").each do |enum_tag|
           enum_name = enum_tag['name']
