@@ -181,11 +181,16 @@ class GLSpec
       type_api = type_tag['api']
       type_requires = type_tag['requires']
 
-      next if type_name == "khrplatform"
+      #next if type_name == 'stddef'
+      #next if type_name == 'inttypes'
+      next if @profile != 'common' && type_name == 'khrplatform'
       next if type_requires && !@types.find { |x| x.name == type_requires }
       next if !match_api_profile(type_api, nil)
 
-      @types << type = GLType.new(type_name, type_api)
+      type = @types.find { |x| x.name == type_name }
+      if !type
+        @types << type = GLType.new(type_name, type_api)
+      end
 
       apientry_displaced = type_tag.to_s.sub(/<apientry\/>/, 'APIENTRY')
       newdoc = Nokogiri::XML(apientry_displaced)

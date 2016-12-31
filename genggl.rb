@@ -64,7 +64,6 @@ $gles1_platform_text = <<TEXT
 #if defined(__ANDROID__)
 #include <GLES/gl.h>
 #include <GLES/glext.h>
-#include <GLES/glplatform.h>
 #endif
 TEXT
 
@@ -76,7 +75,6 @@ $gles2_platform_text = <<TEXT
 #if defined(__ANDROID__)
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
-#include <GLES2/gl2platform.h>
 #endif
 TEXT
 
@@ -88,7 +86,6 @@ $gles3_platform_text = <<TEXT
 #if defined(__ANDROID__)
 #include <GLES3/gl3.h>
 #include <GLES3/gl3ext.h>
-#include <GLES3/gl3platform.h>
 #endif
 TEXT
 
