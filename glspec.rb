@@ -169,6 +169,9 @@ class GLSpec
     parse_commands(doc)
     parse_features(doc)
     parse_extensions(doc)
+
+    # remove #include <KHR/khrplatform.h> by hand
+    @types.delete_if { |x| x.name == 'khrplatform' }
   end
 
   def parse_types(doc)
@@ -181,8 +184,6 @@ class GLSpec
       type_api = type_tag['api']
       type_requires = type_tag['requires']
 
-      #next if type_name == 'stddef'
-      #next if type_name == 'inttypes'
       next if @profile != 'common' && type_name == 'khrplatform'
       next if type_requires && !@types.find { |x| x.name == type_requires }
       next if !match_api_profile(type_api, nil)
