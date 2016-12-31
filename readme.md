@@ -1,4 +1,4 @@
-GenGGL 0.3.2
+GenGGL 0.3.3
 ============================
 
 GenGGL is platform independent OpenGL API C glue code generator written in ruby.
@@ -8,7 +8,7 @@ It will help you to write OpenGL C/C++ code without concerning OpenGL versions a
 Features
 ----------------------------
 
-* Platform independent bindings to specific OpenGL profile and version. (you can specify it with argument)
+* Platform independent bindings to specific OpenGL profile and version. (you can specify it with a following argument)
 * Parsing [OpenGL registry](http://www.opengl.org/registry) XML files as source to generate up-to-date API.
 * There is debug functionalities for OpenGL function calls.
 
@@ -19,8 +19,12 @@ First off, you need ruby 2.0 in system for use.
 	$ cd genggl
 	$ ruby genggl.rb <api> <version>
 
-You should specify profile one of the CORE, COMPATIBILITY, ES and version. 
+You can specify the profile that is one of the "CORE", "COMPATIBILITY", "ES" and version. 
 After that, you could get ggl.h, ggl.c, gglx.h, gglx.c, gwgl.h, gwgl.c
+
+Issues
+----------------------------
+SSL connection error on Windows platform -> [Solution](https://gist.github.com/fnichol/867550)
 
 Usage about ggl (generated C code)
 ----------------------------
