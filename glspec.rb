@@ -2,7 +2,7 @@
 #
 # glspec.rb
 # GenGGL (OpenGL extension glue code generator in C)
-# Version: 0.3.2
+# Version: 0.3.3
 #
 # Copyright 2010 Ju Hyung Lee. All rights reserved.
 #

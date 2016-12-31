@@ -61,6 +61,11 @@ $gles1_platform_text = <<TEXT
 #include <OpenGLES/ES1/gl.h>
 #include <OpenGLES/ES1/glext.h>
 #endif
+#if defined(__ANDROID__)
+#include <GLES/gl.h>
+#include <GLES/glext.h>
+#include <GLES/glplatform.h>
+#endif
 TEXT
 
 $gles2_platform_text = <<TEXT
@@ -68,12 +73,22 @@ $gles2_platform_text = <<TEXT
 #include <OpenGLES/ES2/gl.h>
 #include <OpenGLES/ES2/glext.h>
 #endif
+#if defined(__ANDROID__)
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
+#include <GLES2/gl2platform.h>
+#endif
 TEXT
 
 $gles3_platform_text = <<TEXT
 #if defined(__APPLE__)
 #include <OpenGLES/ES3/gl.h>
 #include <OpenGLES/ES3/glext.h>
+#endif
+#if defined(__ANDROID__)
+#include <GLES3/gl3.h>
+#include <GLES3/gl3ext.h>
+#include <GLES3/gl3platform.h>
 #endif
 TEXT
 
@@ -374,7 +389,8 @@ TEXT
     if @spec.api == "wgl" || !@has_GL_NUM_EXTENSIONS
       f << "\treturn strstr(#{basename}ext_str, ext) ? 1 : 0;\n"
     else
-      f << "\tfor (GLint i = 0; i < #{basename}ext_count; i++) {\n"
+      f << "\tGLint i = 0;\n"
+      f << "\tfor (; i < #{basename}ext_count; i++) {\n"
       f << "\t\tif (!strcmp((const char *)_glGetStringi(GL_EXTENSIONS, i), ext)) {\n";
       f << "\t\t\treturn 1;\n"
       f << "\t\t}\n"
@@ -505,16 +521,15 @@ end
 all_version = 100
 $user_version = ARGV[1].to_f
 
-case ARGV[0]
-when "core"
+if ARGV[0].casecmp("core") == 0
   $user_profile = "core"
   $user_api = "gl"
   $user_dir = "GL"
-when "compatibility"
+elsif ARGV[0].casecmp("compatibility") == 0
   $user_profile = "compatibility"
   $user_api = "gl"
   $user_dir = "GL"
-when "es"
+elsif ARGV[0].casecmp("es") == 0
   $user_profile = "common"
   if $user_version < 2.0
     $user_api = "gles1"
