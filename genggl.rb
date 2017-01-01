@@ -574,7 +574,13 @@ puts "Trying to generate GGL based on #{$user_api} #{$user_profile} #{$user_vers
 
 #-------------------------------------------------------------------------------
 
-puts "Downloading Khronos GLES header files..."
+puts "Downloading Khronos GL header files..."
+
+Dir.mkdir("GL") unless File.exists?("GL")
+File.write("GL/glext.h", Net::HTTP.get(URI.parse("https://www.opengl.org/registry/api/GL/glext.h")))
+File.write("GL/glcorearb.h", Net::HTTP.get(URI.parse("https://www.opengl.org/registry/api/GL/glcorearb.h")))
+File.write("GL/glxext.h", Net::HTTP.get(URI.parse("https://www.opengl.org/registry/api/GL/glxext.h")))
+File.write("GL/wglext.h", Net::HTTP.get(URI.parse("https://www.opengl.org/registry/api/GL/wglext.h")))
 
 Dir.mkdir("GLES") unless File.exists?("GLES")
 File.write("GLES/gl.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES/gl.h")))
