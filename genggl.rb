@@ -126,7 +126,6 @@ void *nsglGetProcAddress(const char *procname) {
 #endif
 TEXT
 
-require 'net/http'
 #require 'profile'
 require 'rbconfig'
 require './glspec.rb'
@@ -184,19 +183,21 @@ TEXT
     f << text
   end
 
-  def generate_header_and_source_file(dirname, basename)
+  def generate_header_and_source_file(dirname, filename, basename)
     Dir.mkdir(dirname) unless File.exists?(dirname)
 
-    generate_header_file(dirname, basename)
-    generate_source_file(dirname, basename)
+    generate_header_file(dirname, filename, basename)
+    generate_source_file(dirname, filename, basename)
   end
 
-  def generate_header_file(dirname, basename)
-    File.open("#{dirname}/#{basename}.h", "w") do |f|
-      write_license_comment(f, "#{basename}.h")
+  def generate_header_file(dirname, filename, basename)
 
-      f << "\n#ifndef __#{basename.upcase}_H__\n"
-      f << "#define __#{basename.upcase}_H__\n\n"
+
+    File.open("#{dirname}/#{filename}.h", "w") do |f|
+      write_license_comment(f, "#{filename}.h")
+
+      f << "\n#ifndef __#{filename.upcase}_H__\n"
+      f << "#define __#{filename.upcase}_H__\n\n"
       f << "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n"
 
       if @spec.api == "gl"
@@ -247,10 +248,10 @@ TEXT
       f << "extern void #{basename}_rebind(int enableDebug);\n"
 
       f << "\n#ifdef __cplusplus\n}\n#endif\n\n"
-      f << "#endif /* __#{basename.upcase}_H__ */\n"
+      f << "#endif /* __#{filename.upcase}_H__ */\n"
     end
 
-    puts "#{dirname}/#{basename}.h generated"
+    puts "#{dirname}/#{filename}.h generated"
   end
 
   def write_header_types(f)
@@ -316,11 +317,11 @@ TEXT
     end
   end
 
-  def generate_source_file(dirname, basename)
-    File.open("#{dirname}/#{basename}.c", "w") do |f|
-      write_license_comment(f, "#{basename}.c")
+  def generate_source_file(dirname, filename, basename)
+    File.open("#{dirname}/#{filename}.c", "w") do |f|
+      write_license_comment(f, "#{filename}.c")
 
-      f << "\n#include \"#{basename}.h\"\n"
+      f << "\n#include \"#{filename}.h\"\n"
       f << "#include <string.h>\n\n"
       f << "extern void CheckGLError(const char *msg);\n\n"
 
@@ -342,7 +343,7 @@ TEXT
       write_source_func_rebind(basename, f)
     end
 
-    puts "#{dirname}/#{basename}.c generated"
+    puts "#{dirname}/#{filename}.c generated"
   end
 
   def write_source_gl_functions(f)
@@ -574,42 +575,6 @@ puts "Trying to generate GGL based on #{$user_api} #{$user_profile} #{$user_vers
 
 #-------------------------------------------------------------------------------
 
-puts "Downloading GL header files..."
-
-Dir.mkdir("GL") unless File.exists?("GL")
-File.write("GL/glext.h", Net::HTTP.get(URI.parse("https://www.opengl.org/registry/api/GL/glext.h")))
-File.write("GL/glcorearb.h", Net::HTTP.get(URI.parse("https://www.opengl.org/registry/api/GL/glcorearb.h")))
-File.write("GL/glxext.h", Net::HTTP.get(URI.parse("https://www.opengl.org/registry/api/GL/glxext.h")))
-File.write("GL/wglext.h", Net::HTTP.get(URI.parse("https://www.opengl.org/registry/api/GL/wglext.h")))
-
-puts "Downloading GLES header files..."
-
-Dir.mkdir("GLES") unless File.exists?("GLES")
-File.write("GLES/gl.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES/gl.h")))
-File.write("GLES/glext.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES/glext.h")))
-File.write("GLES/glplatform.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES/glplatform.h")))
-
-Dir.mkdir("GLES2") unless File.exists?("GLES2")
-File.write("GLES2/gl2.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES2/gl2.h")))
-File.write("GLES2/gl2ext.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES2/gl2ext.h")))
-File.write("GLES2/gl2platform.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES2/gl2platform.h")))
-
-Dir.mkdir("GLES3") unless File.exists?("GLES3")
-File.write("GLES3/gl3.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES3/gl3.h")))
-File.write("GLES3/gl31.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES3/gl31.h")))
-File.write("GLES3/gl32.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES3/gl32.h")))
-File.write("GLES3/gl3platform.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES3/gl3platform.h")))
-
-Dir.mkdir("KHR") unless File.exists?("KHR")
-File.write("KHR/khrplatform.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/egl/api/KHR/khrplatform.h")))
-
-puts "Downloading EGL header files..."
-
-Dir.mkdir("EGL") unless File.exists?("EGL")
-File.write("EGL/egl.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/egl/api/EGL/egl.h")))
-File.write("EGL/eglext.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/egl/api/EGL/eglext.h")))
-File.write("EGL/eglplatform.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/egl/api/EGL/eglplatform.h")))
-
 registry_url = "https://cvs.khronos.org/svn/repos/ogl/trunk/doc/registry/public/api"
 
 spec = GLSpec.new(
@@ -620,7 +585,7 @@ spec = GLSpec.new(
 )
 
 gen = GGLGenerator.new(spec)
-gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}#{$user_filename}")
+gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}#{$user_filename}", "#{$genggl_prefix}gl")
 
 if $user_api == "gl"
   spec = GLSpec.new(
@@ -631,7 +596,7 @@ if $user_api == "gl"
   )
 
   gen = GGLGenerator.new(spec)
-  gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}glx")
+  gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}glx", "#{$genggl_prefix}glx")
 
   spec = GLSpec.new(
     :api => "wgl",
@@ -641,7 +606,7 @@ if $user_api == "gl"
   )
 
   gen = GGLGenerator.new(spec)
-  gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}wgl")
+  gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}wgl", "#{$genggl_prefix}wgl")
 end
 
 if $user_api == "gles1" || $user_api == "gles2"
@@ -653,5 +618,5 @@ if $user_api == "gles1" || $user_api == "gles2"
   )
 
   gen = GGLGenerator.new(spec)
-  gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}egl")
+  gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}egl", "#{$genggl_prefix}egl")
 end
