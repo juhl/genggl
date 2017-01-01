@@ -1,4 +1,4 @@
-GenGGL 0.3.3
+GenGGL 0.4
 ============================
 
 GenGGL is platform independent OpenGL API C glue code generator written in ruby.
@@ -20,7 +20,7 @@ First off, you need ruby 2.0 in system for use.
 	$ ruby genggl.rb <api> <version>
 
 You can specify the profile that is one of the "CORE", "COMPATIBILITY", "ES" and version. 
-After that, you could get ggl.h, ggl.c, gglx.h, gglx.c, gwgl.h, gwgl.c
+After that, you could get all the output files in GGL folder
 
 Issues
 ----------------------------
@@ -31,27 +31,6 @@ Usage about ggl (generated C code)
 * ggl_init: initialize ggl function pointers for use.
 * ggl_rebind: re-bind ggl function pointers for debug purpose
 * you can check extensions easily with provided extension struct. (ex. gglext._GL_EXT_texture3D)
-
-##ggl.h##
-
-	extern gglext_t gglext;
-
-	extern void ggl_init(int enableDebug);
-	extern void ggl_rebind(int enableDebug);
-
-##gwgl.h (for windows extension)##
-
-	extern gwglext_t gwglext;
-
-	extern void gwgl_init(HDC hdc, int enableDebug);
-	extern void gwgl_rebind(int enableDebug);
-
-##gglx.h (for linux extension)##
-
-	extern gglxext_t gglxext;
-
-	extern void gglx_init(int enableDebug);
-	extern void gglx_rebind(int enableDebug);
 
 Callback functions
 ----------------------------

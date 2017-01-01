@@ -2,7 +2,6 @@
 #
 # genggl.rb
 # GenGGL (OpenGL extension glue code generator in C)
-# Version: 0.3.2
 #
 # Copyright 2010 Ju Hyung Lee. All rights reserved.
 #
@@ -32,7 +31,7 @@
 #
 #----------------------------------------------------------------------------------------------
 
-$genggl_version_string = "0.3.2"
+$genggl_version_string = "0.4"
 $genggl_prefix = "g"
 
 $gl_platform_text = <<TEXT
@@ -57,12 +56,15 @@ $wgl_platform_text = <<TEXT
 TEXT
 
 $gles1_platform_text = <<TEXT
-#if defined(__APPLE__)
+#if defined(__WIN32__)
+#include "GLES/gl.h"
+#include "GLES/glext.h"
+#include "KHR/khrplatform.h"
+#elif defined(__APPLE__)
 #include <OpenGLES/ES1/gl.h>
 #include <OpenGLES/ES1/glext.h>
-#include "khrplatform.h"
-#endif
-#if defined(__ANDROID__)
+#include "KHR/khrplatform.h"
+#elif defined(__ANDROID__)
 #include <GLES/gl.h>
 #include <GLES/glext.h>
 #include <GLES/glplatform.h>
@@ -70,12 +72,15 @@ $gles1_platform_text = <<TEXT
 TEXT
 
 $gles2_platform_text = <<TEXT
-#if defined(__APPLE__)
+#if defined(__WIN32__)
+#include "GLES2/gl2.h"
+#include "GLES2/gl2ext.h"
+#include "KHR/khrplatform.h"
+#elif defined(__APPLE__)
 #include <OpenGLES/ES2/gl.h>
 #include <OpenGLES/ES2/glext.h>
-#include "khrplatform.h"
-#endif
-#if defined(__ANDROID__)
+#include "KHR/khrplatform.h"
+#elif defined(__ANDROID__)
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
 #include <GLES2/gl2platform.h>
@@ -83,12 +88,15 @@ $gles2_platform_text = <<TEXT
 TEXT
 
 $gles3_platform_text = <<TEXT
-#if defined(__APPLE__)
+#if defined(__WIN32__)
+#include "GLES3/gl3.h"
+#include "GLES2/gl2ext.h"
+#include "KHR/khrplatform.h"
+#elif defined(__APPLE__)
 #include <OpenGLES/ES3/gl.h>
 #include <OpenGLES/ES3/glext.h>
-#include "khrplatform.h"
-#endif
-#if defined(__ANDROID__)
+#include "KHR/khrplatform.h"
+#elif defined(__ANDROID__)
 #include <GLES3/gl3.h>
 #include <GLES3/gl3ext.h>
 #include <GLES3/gl3platform.h>
@@ -118,6 +126,7 @@ void *nsglGetProcAddress(const char *procname) {
 #endif
 TEXT
 
+require 'net/http'
 #require 'profile'
 require 'rbconfig'
 require './glspec.rb'
@@ -510,9 +519,21 @@ def get_os_type
   else; nil; end
 end
 
+# 3.0 -> 3
+# 3.2 -> 32
+def version_to_s(version)
+  while version.modulo(1) != 0 do
+    version = version * 10
+  end
+
+  return version.to_i.to_s
+end
+
 #-------------------------------------------------------------------------------
 
 valid_profile_strings = ["core", "compatibility", "es"]
+
+STDOUT.sync = true
 
 if ARGV[0] == "--help"
   puts "Usage: genggl <api> <version>"
@@ -527,22 +548,22 @@ $user_version = ARGV[1].to_f
 if ARGV[0].casecmp("core") == 0
   $user_profile = "core"
   $user_api = "gl"
-  $user_dir = "GL"
+  $user_filename = "glcore" + version_to_s($user_version)
 elsif ARGV[0].casecmp("compatibility") == 0
   $user_profile = "compatibility"
   $user_api = "gl"
-  $user_dir = "GL"
+  $user_filename = "gl"
 elsif ARGV[0].casecmp("es") == 0
   $user_profile = "common"
   if $user_version < 2.0
     $user_api = "gles1"
-    $user_dir = "GLES"
+    $user_filename = "gles"
   elsif $user_version < 3.0
     $user_api = "gles2"
-    $user_dir = "GLES2"
+    $user_filename = "gles2"
   else
     $user_api = "gles2"
-    $user_dir = "GLES3"
+    $user_filename = "gles" + version_to_s($user_version)
   end
 else
   puts "Invalid profile #{ARGV[0]}"
@@ -553,8 +574,27 @@ puts "Trying to generate GGL based on #{$user_api} #{$user_profile} #{$user_vers
 
 #-------------------------------------------------------------------------------
 
-#registry_url = "http://www.opengl.org/registry/api"
-#registry_url = "https://cvs.khronos.org/svn/repos/ogl/trunk/doc/registry/public/oldspecs"
+puts "Downloading Khronos GLES header files..."
+
+Dir.mkdir("GLES") unless File.exists?("GLES")
+File.write("GLES/gl.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES/gl.h")))
+File.write("GLES/glext.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES/glext.h")))
+File.write("GLES/glplatform.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES/glplatform.h")))
+
+Dir.mkdir("GLES2") unless File.exists?("GLES2")
+File.write("GLES2/gl2.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES2/gl2.h")))
+File.write("GLES2/gl2ext.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES2/gl2ext.h")))
+File.write("GLES2/gl2platform.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES2/gl2platform.h")))
+
+Dir.mkdir("GLES3") unless File.exists?("GLES3")
+File.write("GLES3/gl3.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES3/gl3.h")))
+File.write("GLES3/gl31.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES3/gl31.h")))
+File.write("GLES3/gl32.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES3/gl32.h")))
+File.write("GLES3/gl3platform.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/gles/api/GLES3/gl3platform.h")))
+
+Dir.mkdir("KHR") unless File.exists?("KHR")
+File.write("KHR/khrplatform.h", Net::HTTP.get(URI.parse("http://khronos.org/registry/egl/api/KHR/khrplatform.h")))
+
 registry_url = "https://cvs.khronos.org/svn/repos/ogl/trunk/doc/registry/public/api"
 
 spec = GLSpec.new(
@@ -565,7 +605,7 @@ spec = GLSpec.new(
 )
 
 gen = GGLGenerator.new(spec)
-gen.generate_header_and_source_file($user_dir, "#{$genggl_prefix}gl")
+gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}#{$user_filename}")
 
 if $user_api == "gl"
   spec = GLSpec.new(
@@ -576,7 +616,7 @@ if $user_api == "gl"
   )
 
   gen = GGLGenerator.new(spec)
-  gen.generate_header_and_source_file($user_dir, "#{$genggl_prefix}glx")
+  gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}glx")
 
   spec = GLSpec.new(
     :api => "wgl",
@@ -586,5 +626,17 @@ if $user_api == "gl"
   )
 
   gen = GGLGenerator.new(spec)
-  gen.generate_header_and_source_file($user_dir, "#{$genggl_prefix}wgl")
+  gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}wgl")
+end
+
+if $user_api == "gles1" || $user_api == "gles2"
+  spec = GLSpec.new(
+    :api => "egl",
+    :profile => "common",
+    :version => all_version,
+    :url => "#{registry_url}/egl.xml"
+  )
+
+  gen = GGLGenerator.new(spec)
+  gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}egl")
 end

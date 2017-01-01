@@ -2,7 +2,6 @@
 #
 # glspec.rb
 # GenGGL (OpenGL extension glue code generator in C)
-# Version: 0.3.3
 #
 # Copyright 2010 Ju Hyung Lee. All rights reserved.
 #
@@ -160,7 +159,7 @@ class GLSpec
   end
 
   def parse_xml(url)
-    puts "parsing #{url}..."
+    puts "Parsing #{url}..."
     doc = Nokogiri::XML(open(url))
 
     parse_types(doc)
