@@ -8,9 +8,9 @@ It will help you to write OpenGL C/C++ code without concerning OpenGL versions a
 Features
 ----------------------------
 
-* Platform independent bindings to specific OpenGL profile and version. (you can specify it with a following argument)
+* Platform independent bindings to specific OpenGL profile and version. (you can specify it with following arguments)
 * Parsing [OpenGL registry](http://www.opengl.org/registry) XML files as source to generate up-to-date API.
-* There is debug functionalities for OpenGL function calls.
+* There are debug functionalities for OpenGL function calls.
 
 Usage
 ----------------------------
