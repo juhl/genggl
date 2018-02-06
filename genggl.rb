@@ -56,7 +56,7 @@ $wgl_platform_text = <<TEXT
 TEXT
 
 $gles1_platform_text = <<TEXT
-#if defined(__WIN32__)
+#if defined(_WIN32)
 #include "GLES/gl.h"
 #include "GLES/glext.h"
 #include "KHR/khrplatform.h"
@@ -64,7 +64,7 @@ $gles1_platform_text = <<TEXT
 #include <OpenGLES/ES1/gl.h>
 #include <OpenGLES/ES1/glext.h>
 #include "KHR/khrplatform.h"
-#elif defined(__ANDROID__)
+#elif defined(ANDROID)
 #include <GLES/gl.h>
 #include <GLES/glext.h>
 #include <GLES/glplatform.h>
@@ -72,7 +72,7 @@ $gles1_platform_text = <<TEXT
 TEXT
 
 $gles2_platform_text = <<TEXT
-#if defined(__WIN32__)
+#if defined(_WIN32)
 #include "GLES2/gl2.h"
 #include "GLES2/gl2ext.h"
 #include "KHR/khrplatform.h"
@@ -80,7 +80,7 @@ $gles2_platform_text = <<TEXT
 #include <OpenGLES/ES2/gl.h>
 #include <OpenGLES/ES2/glext.h>
 #include "KHR/khrplatform.h"
-#elif defined(__ANDROID__)
+#elif defined(ANDROID)
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
 #include <GLES2/gl2platform.h>
@@ -88,7 +88,7 @@ $gles2_platform_text = <<TEXT
 TEXT
 
 $gles3_platform_text = <<TEXT
-#if defined(__WIN32__)
+#if defined(_WIN32)
 #include "GLES3/gl3.h"
 #include "GLES2/gl2ext.h"
 #include "KHR/khrplatform.h"
@@ -96,7 +96,7 @@ $gles3_platform_text = <<TEXT
 #include <OpenGLES/ES3/gl.h>
 #include <OpenGLES/ES3/glext.h>
 #include "KHR/khrplatform.h"
-#elif defined(__ANDROID__)
+#elif defined(ANDROID)
 #include <GLES3/gl3.h>
 #include <GLES3/gl3ext.h>
 #include <GLES3/gl3platform.h>
