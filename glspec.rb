@@ -239,6 +239,10 @@ class GLSpec
           param_content.sub!(/\bfar\b/, 'zfar')
         end
 
+        if param_name[0] == '*'
+          param_name[0] = ''
+        end
+
         param = GLCommandParam.new(param_name, param_content, param_group_name)
         command.params << param
       end

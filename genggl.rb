@@ -58,8 +58,6 @@ TEXT
 $gles1_platform_text = <<TEXT
 #if defined(_WIN32)
 #include "GLES/gl.h"
-#include "GLES/glext.h"
-#include "KHR/khrplatform.h"
 #elif defined(__APPLE__)
 #include <OpenGLES/ES1/gl.h>
 #include <OpenGLES/ES1/glext.h>
@@ -74,8 +72,6 @@ TEXT
 $gles2_platform_text = <<TEXT
 #if defined(_WIN32)
 #include "GLES2/gl2.h"
-#include "GLES2/gl2ext.h"
-#include "KHR/khrplatform.h"
 #elif defined(__APPLE__)
 #include <OpenGLES/ES2/gl.h>
 #include <OpenGLES/ES2/glext.h>
@@ -90,8 +86,6 @@ TEXT
 $gles3_platform_text = <<TEXT
 #if defined(_WIN32)
 #include "GLES3/gl3.h"
-#include "GLES2/gl2ext.h"
-#include "KHR/khrplatform.h"
 #elif defined(__APPLE__)
 #include <OpenGLES/ES3/gl.h>
 #include <OpenGLES/ES3/glext.h>
@@ -101,6 +95,10 @@ $gles3_platform_text = <<TEXT
 #include <GLES3/gl3ext.h>
 #include <GLES3/gl3platform.h>
 #endif
+TEXT
+
+$egl_platform_text = <<TEXT
+#include "EGL/egl.h"
 TEXT
 
 $gpa_text = <<TEXT
@@ -191,8 +189,6 @@ TEXT
   end
 
   def generate_header_file(dirname, filename, basename)
-
-
     File.open("#{dirname}/#{filename}.h", "w") do |f|
       write_license_comment(f, "#{filename}.h")
 
@@ -212,9 +208,10 @@ TEXT
         else
           f << $gles3_platform_text
         end
+      elsif @spec.api == "egl"
+        f << $egl_platform_text
       end
 
-      f << "\n"
       f << "#ifndef APIENTRY\n"
       f << "#define APIENTRY\n"
       f << "#endif\n"
@@ -242,6 +239,8 @@ TEXT
 
       if @spec.api == "wgl"
         f << "extern void #{basename}_init(HDC hdc, int enableDebug);\n"
+      elsif @spec.api == "egl"
+        f << "extern void #{basename}_init(EGLDisplay display, int enableDebug);\n"        
       else
         f << "extern void #{basename}_init(int enableDebug);\n"
       end
@@ -395,6 +394,7 @@ TEXT
       f << "static const char *#{basename}ext_str = NULL;\n"
     else
       f << "static GLint #{basename}ext_count = 0;\n"
+      f << "static const GLubyte *#{basename}ext_strings[256];\n"
     end
 
     f << "\nstatic int #{basename}_check_extension(const char *ext) {\n"
@@ -404,7 +404,7 @@ TEXT
     else
       f << "\tGLint i = 0;\n"
       f << "\tfor (; i < #{basename}ext_count; i++) {\n"
-      f << "\t\tif (!strcmp((const char *)_glGetStringi(GL_EXTENSIONS, i), ext)) {\n";
+      f << "\t\tif (!strcmp(#{basename}ext_strings[i], ext)) {\n";
       f << "\t\t\treturn 1;\n"
       f << "\t\t}\n"
       f << "\t}\n"
@@ -415,6 +415,8 @@ TEXT
 
     if @spec.api == "wgl"
       f << "\nvoid #{basename}_init(HDC hdc, int enableDebug) {\n"
+    elsif @spec.api == "egl"
+      f << "\nvoid #{basename}_init(EGLDisplay display, int enableDebug) {\n"
     else
       f << "\nvoid #{basename}_init(int enableDebug) {\n"
     end
@@ -427,7 +429,7 @@ TEXT
       feature.commands.each do |command|
         next if !command.required
 
-        if (@spec.api == 'gl' && feature.version <= 1.1) || @spec.api =~ /^gles/
+        if (@spec.api == 'gl' && feature.version <= 1.1) || @spec.api =~ /^gles/ || @spec.api =~ /^egl/
           f << "\t_#{command.name} = #{command.name};\n"
         else
           f << "\t_#{command.name} = (PFN#{command.name.upcase})GPA(#{command.name});\n"
@@ -453,6 +455,8 @@ TEXT
 
         if @spec.api =~ /^gles/
           f << "\t_#{command.name} = #{command.name};\n"
+        elsif @spec.api =~ /^egl/
+          f << "\t_#{command.name} = (PFN#{command.name.upcase})eglGetProcAddress(\"#{command.name}\");\n"
         else
           f << "\t_#{command.name} = (PFN#{command.name.upcase})GPA(#{command.name});\n"
         end
@@ -472,10 +476,15 @@ TEXT
 
     if @spec.api == "wgl"
       f << "\t#{basename}ext_str = (const char *)_wglGetExtensionsStringARB(hdc);\n"
+    elsif @spec.api == "egl"
+      f << "\t#{basename}ext_str = (const char *)_eglQueryString(display, EGL_EXTENSIONS);\n"
     elsif !@has_GL_NUM_EXTENSIONS
       f << "\t#{basename}ext_str = (const char *)_glGetString(GL_EXTENSIONS);\n"
     else
       f << "\t_glGetIntegerv(GL_NUM_EXTENSIONS, &#{basename}ext_count);\n"
+      f << "\tfor (int i = 0; i < #{basename}ext_count; i++) {\n"
+      f << "\t\t#{basename}ext_strings[i] = _glGetStringi(GL_EXTENSIONS, i);\n"
+      f << "\t}\n"
     end
 
     f << "\tmemset(&#{basename}ext, 0, sizeof(#{basename}ext));\n"
