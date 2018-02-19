@@ -31,7 +31,7 @@
 #
 #----------------------------------------------------------------------------------------------
 
-$genggl_version_string = "0.4"
+$genggl_version_string = "0.5"
 $genggl_prefix = "g"
 
 $gl_platform_text = <<TEXT
@@ -101,7 +101,7 @@ $egl_platform_text = <<TEXT
 #include "EGL/egl.h"
 TEXT
 
-$gpa_text = <<TEXT
+$gl_gpa_text = <<TEXT
 #ifdef _WIN32
 #define GPA(a) wglGetProcAddress(#a)
 #elif defined(__APPLE__)
@@ -121,6 +121,14 @@ void *nsglGetProcAddress(const char *procname) {
 }
 #elif defined(__linux__)
 #define GPA(a) glXGetProcAddressARB((const GLubyte *)#a)
+#endif
+TEXT
+
+$gles_gpa_text = <<TEXT
+#if defined(ANDROID) || defined(__linux__)
+#define GPA(a) eglGetProcAddress(#a)
+#elif defined(__APPLE__)
+#define GPA(a) a
 #endif
 TEXT
 
@@ -332,7 +340,11 @@ TEXT
 
       if @spec.api =~ /^(gl|wgl|glx)$/
         f << "\n"
-        f << $gpa_text
+        f << $gl_gpa_text
+        f << "\n"
+      else @spec.api =~ /^gles/
+        f << "\n"
+        f << $gles_gpa_text
         f << "\n"
       end
 
@@ -429,7 +441,7 @@ TEXT
       feature.commands.each do |command|
         next if !command.required
 
-        if (@spec.api == 'gl' && feature.version <= 1.1) || @spec.api =~ /^gles/ || @spec.api =~ /^egl/
+        if (@spec.api == 'gl' && feature.version <= 1.1) || @spec.api =~ /^egl/
           f << "\t_#{command.name} = #{command.name};\n"
         else
           f << "\t_#{command.name} = (PFN#{command.name.upcase})GPA(#{command.name});\n"
@@ -453,9 +465,7 @@ TEXT
       extension.commands.each do |command|
         next if !command.required
 
-        if @spec.api =~ /^gles/
-          f << "\t_#{command.name} = #{command.name};\n"
-        elsif @spec.api =~ /^egl/
+        if @spec.api =~ /^egl/
           f << "\t_#{command.name} = (PFN#{command.name.upcase})eglGetProcAddress(\"#{command.name}\");\n"
         else
           f << "\t_#{command.name} = (PFN#{command.name.upcase})GPA(#{command.name});\n"
