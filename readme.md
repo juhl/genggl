@@ -1,4 +1,4 @@
-GenGGL 0.4
+GenGGL
 ============================
 
 GenGGL is platform independent OpenGL API C glue code generator written in ruby.
