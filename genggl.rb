@@ -126,6 +126,7 @@ TEXT
 
 $gles_gpa_text = <<TEXT
 #if defined(ANDROID) || defined(__linux__)
+#include <EGL/egl.h>
 #define GPA(a) eglGetProcAddress(#a)
 #elif defined(__APPLE__)
 #define GPA(a) a
