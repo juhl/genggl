@@ -407,7 +407,7 @@ TEXT
       f << "static const char *#{basename}ext_str = NULL;\n"
     else
       f << "static GLint #{basename}ext_count = 0;\n"
-      f << "static const GLubyte *#{basename}ext_strings[256];\n"
+      f << "static const char *#{basename}ext_strings[512];\n"
     end
 
     f << "\nstatic int #{basename}_check_extension(const char *ext) {\n"
@@ -494,7 +494,7 @@ TEXT
     else
       f << "\t_glGetIntegerv(GL_NUM_EXTENSIONS, &#{basename}ext_count);\n"
       f << "\tfor (int i = 0; i < #{basename}ext_count; i++) {\n"
-      f << "\t\t#{basename}ext_strings[i] = _glGetStringi(GL_EXTENSIONS, i);\n"
+      f << "\t\t#{basename}ext_strings[i] = (const char *)_glGetStringi(GL_EXTENSIONS, i);\n"
       f << "\t}\n"
     end
 
