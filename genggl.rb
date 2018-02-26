@@ -133,6 +133,11 @@ $gles_gpa_text = <<TEXT
 #endif
 TEXT
 
+$egl_gpa_text = <<TEXT
+#include <EGL/egl.h>
+#define GPA(a) eglGetProcAddress(#a)
+TEXT
+
 #require 'profile'
 require 'rbconfig'
 require './glspec.rb'
@@ -343,9 +348,13 @@ TEXT
         f << "\n"
         f << $gl_gpa_text
         f << "\n"
-      else @spec.api =~ /^gles/
+      elsif @spec.api =~ /^gles/
         f << "\n"
         f << $gles_gpa_text
+        f << "\n"
+      else @spec.api =~ /^egl/
+        f << "\n"
+        f << $egl_gpa_text
         f << "\n"
       end
 
@@ -442,7 +451,7 @@ TEXT
       feature.commands.each do |command|
         next if !command.required
 
-        if (@spec.api == 'gl' && feature.version <= 1.1) || @spec.api =~ /^egl/
+        if (@spec.api == 'gl' && feature.version <= 1.1)
           f << "\t_#{command.name} = #{command.name};\n"
         else
           f << "\t_#{command.name} = (PFN#{command.name.upcase})GPA(#{command.name});\n"
@@ -456,7 +465,7 @@ TEXT
 
     @spec.extensions.each do |extension|
       if extension.commands.count > 0
-        if @spec.api =~ /^gles/
+        if @spec.api =~ /^gles/ || @spec.api =~ /^egl/
           f << "#ifdef #{extension.name}\n"
         else
           f << "\t/* #{extension.name} */\n"
@@ -465,16 +474,12 @@ TEXT
 
       extension.commands.each do |command|
         next if !command.required
-
-        if @spec.api =~ /^egl/
-          f << "\t_#{command.name} = (PFN#{command.name.upcase})eglGetProcAddress(\"#{command.name}\");\n"
-        else
-          f << "\t_#{command.name} = (PFN#{command.name.upcase})GPA(#{command.name});\n"
-        end
+    
+        f << "\t_#{command.name} = (PFN#{command.name.upcase})GPA(#{command.name});\n"
       end
 
       if extension.commands.count > 0
-        if @spec.api =~ /^gles/
+        if @spec.api =~ /^gles/ || @spec.api =~ /^egl/
           f << "#endif\n\n"
         else
           f << "\n"
