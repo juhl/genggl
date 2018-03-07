@@ -31,7 +31,7 @@
 #
 #----------------------------------------------------------------------------------------------
 
-$genggl_version_string = "0.5"
+$genggl_version_string = "1.0"
 $genggl_prefix = "g"
 
 $gl_platform_text = <<TEXT
