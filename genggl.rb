@@ -226,6 +226,7 @@ TEXT
         f << $egl_platform_text
       end
 
+      f << "\n"
       f << "#ifndef APIENTRY\n"
       f << "#define APIENTRY\n"
       f << "#endif\n"
@@ -234,7 +235,8 @@ TEXT
       f << "#endif\n"
       f << "#ifndef GLAPI\n"
       f << "#define GLAPI extern\n"
-      f << "#endif\n\n"
+      f << "#endif\n"
+      f << "\n"
 
       write_header_types(f)
       write_header_features(f)
@@ -302,9 +304,13 @@ TEXT
   end
 
   def write_header_extensions(f)
+    if @spec.api =~ /^gles/
+      f << "#ifndef __APPLE__\n\n"
+    end
+
     @spec.extensions.each do |extension|
       f << "#ifndef #{extension.name}\n"
-      f << "#define #{extension.name}\n" if @spec.api !~ /^gles/
+      f << "#define #{extension.name}\n"
 
       extension.enums.each do |enum|
         next if !enum.required
@@ -327,6 +333,10 @@ TEXT
       end
 
       f << "\n"
+    end
+
+    if @spec.api =~ /^gles/
+      f << "#endif // __APPLE__\n\n"
     end
   end
 
@@ -451,7 +461,7 @@ TEXT
       feature.commands.each do |command|
         next if !command.required
 
-        if (@spec.api == 'gl' && feature.version <= 1.1)
+        if (@spec.api == 'gl' && feature.version <= 1.1) || (@spec.api =~ /^gles/ && feature.version <= $user_version)
           f << "\t_#{command.name} = #{command.name};\n"
         else
           f << "\t_#{command.name} = (PFN#{command.name.upcase})GPA(#{command.name});\n"
