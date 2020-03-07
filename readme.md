@@ -16,8 +16,10 @@ Usage
 ----------------------------
 First off, you need ruby 2.0 in system for use. 
 
-	$ cd genggl
-	$ ruby genggl.rb <api> <version>
+~~~
+$ cd genggl
+$ ruby genggl.rb <api> <version>
+~~~
 
 You can specify the profile that is one of the "CORE", "COMPATIBILITY", "ES" and version. 
 After that, you could get all the output files in GGL folder
@@ -28,14 +30,6 @@ SSL connection error on Windows platform -> [Solution](https://gist.github.com/f
 
 Usage about ggl (generated C code)
 ----------------------------
-* ggl_init: initialize ggl function pointers for use.
-* ggl_rebind: re-bind ggl function pointers for debug purpose
-* you can check extensions easily with provided extension struct. (ex. gglext._GL_EXT_texture3D)
-
-Callback functions
-----------------------------
-	/* if you want check GL error, you should set enableDebug as true when calling ggl_bind */
-	void CheckGLError(const char *msg)
-	{
-    	...
-	}
+* `ggl_init`: initialize ggl function pointers for use.
+* `ggl_rebind`: re-bind ggl function pointers for debug purpose
+* you can check extensions easily with provided extension struct. (ex. `gglext._GL_EXT_texture3D`)
