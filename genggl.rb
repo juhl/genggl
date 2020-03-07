@@ -346,7 +346,7 @@ TEXT
 
       f << "\n#include \"#{filename}.h\"\n"
       f << "#include <string.h>\n\n"
-      f << "extern void CheckGLError(const char *msg);\n\n"
+      f << "extern void (*GGLCheckError)(const char *msg);\n\n"
 
       if has_glBegin
         f << "static int _#{$genggl_prefix}glBeginStarted = 0;\n"
@@ -411,9 +411,9 @@ TEXT
           f << "\t_#{$genggl_prefix}glBeginStarted--;\n"
         end
 
-        f << "\tif (!_#{$genggl_prefix}glBeginStarted) { CheckGLError(\"#{command.name}\"); }\n"
+        f << "\tif (!_#{$genggl_prefix}glBeginStarted) { GGLCheckError(\"#{command.name}\"); }\n"
       else
-        f << "\tCheckGLError(\"#{command.name}\");\n"
+        f << "\tGGLCheckError(\"#{command.name}\");\n"
       end
 
       f << "\treturn ret;\n" if command.return_type.casecmp("void") != 0
