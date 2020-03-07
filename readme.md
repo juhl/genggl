@@ -18,7 +18,7 @@ First off, you need ruby 2.0 in system for use.
 
 ~~~
 $ cd genggl
-$ ruby genggl.rb <api> <version>
+$ ruby genggl.rb <api> <version> <output-dir>
 ~~~
 
 You can specify the profile that is one of the "CORE", "COMPATIBILITY", "ES" and version. 
