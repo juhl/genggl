@@ -580,6 +580,7 @@ end
 
 all_version = 100
 $user_version = ARGV[1].to_f
+$user_output_dir = ARGV[2]
 
 if ARGV[0].casecmp("core") == 0
   $user_profile = "core"
@@ -620,7 +621,7 @@ spec = GLSpec.new(
 )
 
 gen = GGLGenerator.new(spec)
-gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}#{$user_filename}", "#{$genggl_prefix}gl")
+gen.generate_header_and_source_file($user_output_dir, "#{$genggl_prefix}#{$user_filename}", "#{$genggl_prefix}gl")
 
 if $user_api == "gl"
   spec = GLSpec.new(
@@ -631,7 +632,7 @@ if $user_api == "gl"
   )
 
   gen = GGLGenerator.new(spec)
-  gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}glx", "#{$genggl_prefix}glx")
+  gen.generate_header_and_source_file($user_output_dir, "#{$genggl_prefix}glx", "#{$genggl_prefix}glx")
 
   spec = GLSpec.new(
     :api => "wgl",
@@ -641,7 +642,7 @@ if $user_api == "gl"
   )
 
   gen = GGLGenerator.new(spec)
-  gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}wgl", "#{$genggl_prefix}wgl")
+  gen.generate_header_and_source_file($user_output_dir, "#{$genggl_prefix}wgl", "#{$genggl_prefix}wgl")
 end
 
 if $user_api == "gles1" || $user_api == "gles2"
@@ -653,5 +654,5 @@ if $user_api == "gles1" || $user_api == "gles2"
   )
 
   gen = GGLGenerator.new(spec)
-  gen.generate_header_and_source_file("GGL", "#{$genggl_prefix}egl", "#{$genggl_prefix}egl")
+  gen.generate_header_and_source_file($user_output_dir, "#{$genggl_prefix}egl", "#{$genggl_prefix}egl")
 end
